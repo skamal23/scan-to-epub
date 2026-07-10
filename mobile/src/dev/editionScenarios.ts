@@ -46,6 +46,14 @@ export const readyEditionScenario: EditionResolutionResult = {
     epubcheckStatus: 'valid',
     epubcheckWarnings: [],
   },
+  delivery: {
+    downloadPath: '/editions/download',
+    downloadToken: 'fixture-download-token-which-is-long-enough-to-be-opaque',
+    filename: 'Pride-and-Prejudice-Jane-Austen.epub',
+    contentLength: 1234,
+    sha256: '377c8b79622702c406de068d1ca4f6d2a8a675f46f801c2fe4013e1af17e6ee9',
+    expiresAt: '2026-07-10T18:10:00Z',
+  },
 };
 
 export const unavailableEditionScenario: EditionResolutionResult = {
@@ -56,6 +64,7 @@ export const unavailableEditionScenario: EditionResolutionResult = {
   source: null,
   rights: null,
   provenance: null,
+  delivery: null,
 };
 
 export const editionScenarioCandidate = candidate;

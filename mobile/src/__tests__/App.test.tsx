@@ -27,6 +27,7 @@ import type {
   MetadataSearchResult,
 } from '../api/metadata';
 import type { EditionClient } from '../api/editions';
+import type { EpubDeliveryClient } from '../api/epubDelivery';
 import { readyEditionScenario } from '../dev/editionScenarios';
 
 const healthyClient = (): BackendClient => ({
@@ -214,16 +215,53 @@ describe('<App />', () => {
   });
 
   test('opens deterministic verified and unavailable edition scenarios', async () => {
-    const view = render(<App client={healthyClient()} showScenarioLauncher />);
+    const editions: EditionClient = { resolve: jest.fn().mockResolvedValue(readyEditionScenario) };
+    const view = render(<App client={healthyClient()} editionClient={editions} showScenarioLauncher />);
     await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
-    expect(view.getByText('Verified open edition')).toBeTruthy();
+    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({ workTitle: 'Pride and Prejudice' }),
+      expect.anything(),
+    );
     fireEvent.press(view.getByRole('button', { name: 'Scan another book' }));
     fireEvent.press(view.getByRole('button', { name: 'Back' }));
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Open edition unavailable' }));
     expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy();
+  });
+
+  test('downloads a verified EPUB, opens the native handoff, and cleans the local copy before another scan', async () => {
+    const start = jest.fn().mockResolvedValue({
+      uri: 'file:///cache/Pride-and-Prejudice-Jane-Austen.epub',
+      filename: 'Pride-and-Prejudice-Jane-Austen.epub',
+    });
+    const delivery: EpubDeliveryClient = {
+      createDownload: jest.fn(() => ({ start, cancel: jest.fn().mockResolvedValue(undefined) })),
+      shareEpub: jest.fn().mockResolvedValue(undefined),
+      cleanup: jest.fn().mockResolvedValue(undefined),
+    };
+    const editions: EditionClient = { resolve: jest.fn().mockResolvedValue(readyEditionScenario) };
+    const view = render(
+      <App
+        client={healthyClient()}
+        editionClient={editions}
+        epubDeliveryClient={delivery}
+        showScenarioLauncher
+      />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
+    await waitFor(() => expect(view.getByRole('button', { name: 'Open in Books' })).toBeTruthy());
+
+    fireEvent.press(view.getByRole('button', { name: 'Open in Books' }));
+    await waitFor(() => expect(start).toHaveBeenCalled());
+    await waitFor(() => expect(delivery.shareEpub).toHaveBeenCalledWith('file:///cache/Pride-and-Prejudice-Jane-Austen.epub'));
+
+    fireEvent.press(view.getByRole('button', { name: 'Scan another book' }));
+    await waitFor(() => expect(delivery.cleanup).toHaveBeenCalledWith('file:///cache/Pride-and-Prejudice-Jane-Austen.epub'));
   });
 
   test('retries a deterministic source outage without rescanning', async () => {

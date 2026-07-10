@@ -9,7 +9,6 @@ import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { metadataScenarios } from './metadataScenarios';
 import {
   editionScenarioCandidate,
-  readyEditionScenario,
   unavailableEditionScenario,
 } from './editionScenarios';
 import { scannerFixtures } from './scannerFixtures';
@@ -25,6 +24,7 @@ export function ScenarioLauncher({
   onTimeout,
   onEditionResult,
   onEditionError,
+  onResolveEdition,
 }: {
   onBack(): void;
   onCandidates(candidates: MetadataCandidate[], providerFailures?: string[]): void;
@@ -36,6 +36,7 @@ export function ScenarioLauncher({
   onTimeout(): void;
   onEditionResult(candidate: MetadataCandidate, result: EditionResolutionResult): void;
   onEditionError(candidate: MetadataCandidate, message: string): void;
+  onResolveEdition(candidate: MetadataCandidate): void;
 }) {
   return (
     <SafeAreaView style={styles.screen}>
@@ -137,7 +138,7 @@ export function ScenarioLauncher({
         <View style={styles.buttonStack}>
           <SecondaryButton
             label="Verified open edition"
-            onPress={() => onEditionResult(editionScenarioCandidate, readyEditionScenario)}
+            onPress={() => onResolveEdition(editionScenarioCandidate)}
           />
           <SecondaryButton
             label="Open edition unavailable"

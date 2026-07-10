@@ -1,6 +1,7 @@
 from typing import Protocol
 
 from book_backend.content_sources.standard_ebooks import StandardEbooksCatalog
+from book_backend.epubs.artifacts import EpubDelivery
 from book_backend.epubs.safety import InvalidEpub, inspect_epub
 from book_backend.epubs.validator import EpubcheckResult
 from book_backend.rights.policy import decide_rights
@@ -14,6 +15,7 @@ from .models import (
     EditionResolveRequest,
     EditionRightsInfo,
     EditionSourceInfo,
+    EpubDeliveryInfo,
     PhysicalEditionInfo,
 )
 
@@ -26,13 +28,24 @@ class EpubValidator(Protocol):
     async def validate(self, content: bytes) -> EpubcheckResult: ...
 
 
+class EpubArtifactStore(Protocol):
+    async def stage(
+        self, content: bytes, sha256: str, title: str, authors: list[str]
+    ) -> EpubDelivery: ...
+
+
 class EditionResolutionService:
     def __init__(
-        self, catalog: StandardEbooksCatalog, acquirer: EpubAcquirer, validator: EpubValidator
+        self,
+        catalog: StandardEbooksCatalog,
+        acquirer: EpubAcquirer,
+        validator: EpubValidator,
+        artifact_store: EpubArtifactStore,
     ):
         self.catalog = catalog
         self.acquirer = acquirer
         self.validator = validator
+        self.artifact_store = artifact_store
 
     async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult:
         entry = self.catalog.find(
@@ -64,6 +77,17 @@ class EditionResolutionService:
             raise ValidationFailed("EPUB conformance validation could not run") from error
         if not validation.valid:
             raise ValidationFailed("EPUBCheck found conformance errors")
+        try:
+            delivery = await self.artifact_store.stage(
+                content=acquired.content,
+                sha256=acquired.sha256,
+                title=entry.digital_title,
+                authors=list(entry.authors[:1]),
+            )
+        except ValueError as error:
+            raise ValidationFailed(
+                "The verified EPUB could not be prepared for delivery"
+            ) from error
         return EditionResolutionResult(
             status="ready",
             physical_edition=_physical_edition(request),
@@ -100,6 +124,14 @@ class EditionResolutionService:
                 epubcheck_version=validation.version,
                 epubcheck_status="valid",
                 epubcheck_warnings=validation.warnings,
+            ),
+            delivery=EpubDeliveryInfo(
+                download_path=delivery.download_path,
+                download_token=delivery.download_token,
+                filename=delivery.filename,
+                content_length=delivery.content_length,
+                sha256=delivery.sha256,
+                expires_at=delivery.expires_at,
             ),
         )
 

@@ -50,6 +50,14 @@ const readyResult = {
     epubcheckStatus: 'valid',
     epubcheckWarnings: [],
   },
+  delivery: {
+    downloadPath: '/editions/download',
+    downloadToken: 'fixture-download-token-which-is-long-enough-to-be-opaque',
+    filename: 'Pride-and-Prejudice-Jane-Austen.epub',
+    contentLength: 1234,
+    sha256: 'a'.repeat(64),
+    expiresAt: '2026-07-10T18:10:00Z',
+  },
 };
 
 
@@ -78,8 +86,11 @@ test('decodes complete ready and unavailable contracts', () => {
     source: null,
     rights: null,
     provenance: null,
+    delivery: null,
   }).status).toBe('unavailable');
   expect(() => decodeEditionResolutionResult({ ...readyResult, provenance: null }))
+    .toThrow(ContractError);
+  expect(() => decodeEditionResolutionResult({ ...readyResult, delivery: null }))
     .toThrow(ContractError);
 });
 

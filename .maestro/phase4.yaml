@@ -10,10 +10,10 @@ name: Phase 4 rights-aware edition resolution
     direction: DOWN
 - tapOn: Verified open edition
 - assertVisible: Verified open edition
-- assertVisible: Standard Ebooks
+- assertVisible: Deterministic test fixture
 - assertVisible: The open digital edition may differ.*
-- assertVisible: Open in Books — available next phase
-- assertVisible: Save to Files — available next phase
+- assertVisible: Open in Books
+- assertVisible: Save to Files
 - scrollUntilVisible:
     element:
       text: Why this edition is available
@@ -21,9 +21,9 @@ name: Phase 4 rights-aware edition resolution
 - tapOn: Why this edition is available
 - scrollUntilVisible:
     element:
-      text: CC0 1.0 Universal
+      text: Test-only artifact
     direction: DOWN
-- assertVisible: CC0 1.0 Universal
+- assertVisible: Test-only artifact
 - assertVisible: United States
 - scrollUntilVisible:
     element:

@@ -46,6 +46,8 @@ BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backen
 
 Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured.
 
+Fixture mode is for automation only. Its download is explicitly labeled **Deterministic test fixture** and contains no source-book text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it downloads one of the reviewed Standard Ebooks editions, checks its pinned SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
+
 ### Expo Go on a physical iPhone
 
 Keep the Mac and iPhone on the same trusted Wi-Fi network, then run:
@@ -67,6 +69,8 @@ Scan that Expo QR code on the iPhone while both devices remain on the same netwo
 The front-cover shutter crops and compresses the photo on the phone, uploads only that bounded crop, and deletes both local temporary files after success, failure, timeout, or cancellation. The backend processes the crop in memory and does not retain it. Barcode scans do not upload a photo.
 
 `make backend-run-phone` uses deterministic demo books. To scan arbitrary ISBNs against live catalogs, use the same `BOOK_CONTACT_EMAIL` and optional `GOOGLE_BOOKS_API_KEY` variables with `make backend-run-phone-live` instead.
+
+For the actual legal-book handoff on a phone, prefer `make backend-run-phone-live`. After a verified result, **Open in Books** and **Save to Files** both open iOS's native share sheet with an EPUB file; the user makes the final Books or Files choice. The app never silently inserts a file into Apple Books. It verifies the downloaded byte length and SHA-256 before handing the file off, and removes its temporary cache copy when the user scans another book.
 
 The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_API_URL`. The checked-in [render.yaml](./render.yaml) describes a reproducible development deployment for that path. Creating the hosted service is intentionally deferred until a remotely reachable backend is needed.
 

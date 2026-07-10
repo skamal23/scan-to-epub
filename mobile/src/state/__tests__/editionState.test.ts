@@ -10,6 +10,7 @@ const unavailable: EditionResolutionResult = {
   source: null,
   rights: null,
   provenance: null,
+  delivery: null,
 };
 
 

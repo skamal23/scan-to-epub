@@ -16,6 +16,13 @@ import {
   type EditionClient,
 } from './src/api/editions';
 import {
+  EpubDeliveryError,
+  type DownloadedEpub,
+  type EpubDeliveryClient,
+  type EpubDownloadTask,
+} from './src/api/epubDelivery';
+import { createExpoEpubDeliveryClient } from './src/api/epubDeliveryRuntime';
+import {
   createMetadataClient,
   type MetadataClient,
   type MetadataQuery,
@@ -29,6 +36,11 @@ import { appReducer, initialAppState } from './src/state/appState';
 import { initialSearchState, searchReducer } from './src/state/searchState';
 import { editionReducer, initialEditionState } from './src/state/editionState';
 import {
+  exportReducer,
+  initialExportState,
+  type ExportIntent,
+} from './src/state/exportState';
+import {
   PrimaryButton,
   SecondaryButton,
   StatusMessage,
@@ -39,6 +51,7 @@ export type AppProps = {
   metadataClient?: MetadataClient;
   coverClient?: CoverClient;
   editionClient?: EditionClient;
+  epubDeliveryClient?: EpubDeliveryClient;
   showScenarioLauncher?: boolean;
 };
 
@@ -65,21 +78,42 @@ const liveEditionClient = createEditionClient({
   fetcher: fetch,
   timeoutMs: 35_000,
 });
+let liveEpubDeliveryClient: EpubDeliveryClient | null = null;
+
+function getLiveEpubDeliveryClient(): EpubDeliveryClient {
+  liveEpubDeliveryClient ??= createExpoEpubDeliveryClient(environment.apiUrl);
+  return liveEpubDeliveryClient;
+}
+
+const deferredEpubDeliveryClient: EpubDeliveryClient = {
+  createDownload(delivery, onProgress) {
+    return getLiveEpubDeliveryClient().createDownload(delivery, onProgress);
+  },
+  shareEpub(uri) {
+    return getLiveEpubDeliveryClient().shareEpub(uri);
+  },
+  cleanup(uri) {
+    return getLiveEpubDeliveryClient().cleanup(uri);
+  },
+};
 
 export default function App({
   client = liveClient,
   metadataClient = liveMetadataClient,
   coverClient = liveCoverClient,
   editionClient = liveEditionClient,
+  epubDeliveryClient = deferredEpubDeliveryClient,
   showScenarioLauncher = __DEV__,
 }: AppProps) {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [searchState, dispatchSearch] = useReducer(searchReducer, initialSearchState);
   const [editionState, dispatchEdition] = useReducer(editionReducer, initialEditionState);
+  const [exportState, dispatchExport] = useReducer(exportReducer, initialExportState);
   const searchGeneration = useRef(0);
   const lastQuery = useRef<MetadataQuery | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const activeEdition = useRef<AbortController | null>(null);
+  const activeDownload = useRef<EpubDownloadTask | null>(null);
   const selectedCandidate = useRef<import('./src/api/metadata').MetadataCandidate | null>(null);
   const [scannerFixture, setScannerFixture] = useState<ScannerFixture | undefined>();
   const [identificationOrigin, setIdentificationOrigin] = useState<'manual' | 'isbn' | 'cover'>('manual');
@@ -149,6 +183,7 @@ export default function App({
     activeEdition.current = controller;
     selectedCandidate.current = candidate;
     dispatchEdition({ type: 'started' });
+    dispatchExport({ type: 'reset' });
     dispatch({ type: 'showEdition' });
     try {
       const result = await editionClient.resolve(requestForCandidate(candidate), controller.signal);
@@ -161,6 +196,76 @@ export default function App({
       if (activeEdition.current === controller) activeEdition.current = null;
     }
   }, [editionClient]);
+
+  const cleanupLocalEpub = useCallback(async () => {
+    const file = exportState.file;
+    if (file) {
+      await epubDeliveryClient.cleanup(file.uri).catch(() => undefined);
+    }
+    dispatchExport({ type: 'reset' });
+  }, [epubDeliveryClient, exportState.file]);
+
+  const showEpubShareSheet = useCallback(async (file: DownloadedEpub, _intent: ExportIntent) => {
+    dispatchExport({ type: 'sharing' });
+    try {
+      await epubDeliveryClient.shareEpub(file.uri);
+      dispatchExport({ type: 'shareFinished' });
+    } catch (error) {
+      const deliveryError = error instanceof EpubDeliveryError
+        ? error
+        : new EpubDeliveryError('download', 'The EPUB could not be shared.');
+      dispatchExport({
+        type: 'failed',
+        code: deliveryError.code,
+        message: deliveryError.message,
+        file,
+      });
+    }
+  }, [epubDeliveryClient]);
+
+  const exportEpub = useCallback(async (intent: ExportIntent) => {
+    const result = editionState.result;
+    if (result?.status !== 'ready' || !result.delivery) return;
+    if (exportState.file) {
+      await showEpubShareSheet(exportState.file, intent);
+      return;
+    }
+    dispatchExport({ type: 'downloadStarted', intent });
+    let task: EpubDownloadTask;
+    try {
+      task = epubDeliveryClient.createDownload(result.delivery, (progress) => {
+        dispatchExport({ type: 'progressed', progress });
+      });
+    } catch (error) {
+      const deliveryError = error instanceof EpubDeliveryError
+        ? error
+        : new EpubDeliveryError('download', 'Temporary file storage is unavailable.');
+      dispatchExport({ type: 'failed', code: deliveryError.code, message: deliveryError.message });
+      return;
+    }
+    activeDownload.current = task;
+    try {
+      const file = await task.start();
+      if (activeDownload.current !== task) {
+        await epubDeliveryClient.cleanup(file.uri).catch(() => undefined);
+        return;
+      }
+      dispatchExport({ type: 'downloaded', file });
+      await showEpubShareSheet(file, intent);
+    } catch (error) {
+      if (activeDownload.current !== task) return;
+      const deliveryError = error instanceof EpubDeliveryError
+        ? error
+        : new EpubDeliveryError('download', 'The verified EPUB could not be downloaded.');
+      dispatchExport({ type: 'failed', code: deliveryError.code, message: deliveryError.message });
+    } finally {
+      if (activeDownload.current === task) activeDownload.current = null;
+    }
+  }, [editionState.result, epubDeliveryClient, exportState.file, showEpubShareSheet]);
+
+  const cancelEpubExport = useCallback(() => {
+    void activeDownload.current?.cancel();
+  }, []);
 
   useEffect(() => {
     void checkHealth();
@@ -244,10 +349,20 @@ export default function App({
         onScanAnother={() => {
           activeEdition.current?.abort();
           activeEdition.current = null;
+          void cleanupLocalEpub();
           selectedCandidate.current = null;
           dispatchEdition({ type: 'reset' });
           dispatchSearch({ type: 'reset' });
           dispatch({ type: 'showScanner' });
+        }}
+        exportState={exportState}
+        onExport={(intent) => void exportEpub(intent)}
+        onCancelExport={cancelEpubExport}
+        onRetryExport={() => {
+          if (exportState.intent) void exportEpub(exportState.intent);
+        }}
+        onRefreshEdition={() => {
+          if (selectedCandidate.current) void resolveEdition(selectedCandidate.current);
         }}
       />
     );
@@ -289,6 +404,7 @@ export default function App({
           dispatchEdition({ type: 'failed', message });
           dispatch({ type: 'showEdition' });
         }}
+        onResolveEdition={(candidate) => void resolveEdition(candidate)}
       />
     );
   }

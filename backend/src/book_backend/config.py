@@ -13,6 +13,7 @@ class Settings:
     contact_email: str | None = None
     cover_max_bytes: int = 3_000_000
     cover_timeout_seconds: float = 15.0
+    epub_artifact_ttl_seconds: int = 600
 
     @classmethod
     def from_env(cls, values: Mapping[str, str] | None = None) -> "Settings":
@@ -23,6 +24,9 @@ class Settings:
 
         fixture_value = source.get("BOOK_FIXTURE_MODE", "false").strip().lower()
         fixture_mode = fixture_value in {"1", "true", "yes", "on"}
+        epub_artifact_ttl_seconds = int(source.get("BOOK_EPUB_ARTIFACT_TTL_SECONDS", "600"))
+        if epub_artifact_ttl_seconds <= 0:
+            raise ValueError("EPUB artifact TTL must be positive")
         return cls(
             environment=environment,
             fixture_mode=fixture_mode,
@@ -30,4 +34,5 @@ class Settings:
             contact_email=source.get("BOOK_CONTACT_EMAIL") or None,
             cover_max_bytes=int(source.get("BOOK_COVER_MAX_BYTES", "3000000")),
             cover_timeout_seconds=float(source.get("BOOK_COVER_TIMEOUT_SECONDS", "15")),
+            epub_artifact_ttl_seconds=epub_artifact_ttl_seconds,
         )

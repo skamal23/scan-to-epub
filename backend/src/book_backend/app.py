@@ -3,7 +3,7 @@ import logging
 from typing import Protocol
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, Response
 
 from .config import Settings
 from .content_sources.standard_ebooks import STANDARD_EBOOKS_CATALOG
@@ -16,6 +16,7 @@ from .editions.errors import SourceUnavailable, ValidationFailed
 from .editions.fixtures import FixtureEditionResolutionService
 from .editions.models import EditionResolutionResult, EditionResolveRequest
 from .editions.service import EditionResolutionService
+from .epubs.artifacts import EphemeralEpubStore
 from .epubs.validator import EpubcheckValidator
 from .metadata.models import MetadataSearchRequest, MetadataSearchResult
 from .metadata.providers import (
@@ -42,8 +43,10 @@ def create_app(
     metadata_service: MetadataSearchService | None = None,
     cover_recognizer: CoverRecognizer | None = None,
     edition_service: EditionResolver | None = None,
+    epub_store: EphemeralEpubStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Book Backend", version="0.1.0")
+    epub_store = epub_store or EphemeralEpubStore(ttl_seconds=settings.epub_artifact_ttl_seconds)
     if metadata_service is None:
         providers = (
             [FixtureMetadataProvider(), FixtureFailureProvider()]
@@ -70,7 +73,7 @@ def create_app(
         )
     if edition_service is None:
         if settings.fixture_mode:
-            edition_service = FixtureEditionResolutionService()
+            edition_service = FixtureEditionResolutionService(artifact_store=epub_store)
         else:
             user_agent = (
                 f"BookToEPUB/0.1 ({settings.contact_email})"
@@ -81,6 +84,7 @@ def create_app(
                 catalog=STANDARD_EBOOKS_CATALOG,
                 acquirer=SafeEpubAcquirer(HttpEpubFetcher(user_agent=user_agent)),
                 validator=EpubcheckValidator(),
+                artifact_store=epub_store,
             )
 
     @app.middleware("http")
@@ -160,6 +164,27 @@ def create_app(
                 status_code=502,
                 detail="The open edition could not be verified",
             ) from error
+
+    @app.get("/editions/download")
+    async def download_epub(request: Request) -> Response:
+        authorization = request.headers.get("authorization", "")
+        scheme, _, token = authorization.partition(" ")
+        if scheme.casefold() != "bearer" or not token:
+            raise HTTPException(status_code=401, detail="A download credential is required")
+        artifact = await epub_store.get(token)
+        if artifact is None:
+            raise HTTPException(status_code=410, detail="The EPUB is no longer available")
+        return Response(
+            content=bytes(artifact.content),
+            media_type="application/epub+zip",
+            headers={
+                "Cache-Control": "no-store",
+                "Content-Disposition": f'attachment; filename="{artifact.filename}"',
+                "Content-Length": str(len(artifact.content)),
+                "X-Content-SHA256": artifact.sha256,
+                "X-Content-Type-Options": "nosniff",
+            },
+        )
 
     return app
 

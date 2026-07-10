@@ -71,6 +71,15 @@ class EditionProvenance(APIModel):
     epubcheck_warnings: list[str]
 
 
+class EpubDeliveryInfo(APIModel):
+    download_path: str
+    download_token: str
+    filename: str
+    content_length: int
+    sha256: str
+    expires_at: datetime
+
+
 class EditionResolutionResult(APIModel):
     status: Literal["ready", "unavailable"]
     reason: str | None = None
@@ -79,3 +88,4 @@ class EditionResolutionResult(APIModel):
     source: EditionSourceInfo | None = None
     rights: EditionRightsInfo | None = None
     provenance: EditionProvenance | None = None
+    delivery: EpubDeliveryInfo | None = None

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MetadataCandidate } from '../api/metadata';
 import type { EditionState } from '../state/editionState';
+import type { ExportIntent, ExportState } from '../state/exportState';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 
 
@@ -13,12 +14,22 @@ export function EditionResolutionFlow({
   onBack,
   onRetry,
   onScanAnother,
+  exportState,
+  onExport,
+  onCancelExport,
+  onRetryExport,
+  onRefreshEdition,
 }: {
   candidate: MetadataCandidate;
   state: EditionState;
   onBack(): void;
   onRetry(): void;
   onScanAnother(): void;
+  exportState: ExportState;
+  onExport(intent: ExportIntent): void;
+  onCancelExport(): void;
+  onRetryExport(): void;
+  onRefreshEdition(): void;
 }) {
   if (state.status === 'searching' || state.status === 'idle') {
     return <Searching candidate={candidate} onBack={onBack} />;
@@ -43,7 +54,7 @@ export function EditionResolutionFlow({
       />
     );
   }
-  if (!state.result.digitalEdition || !state.result.source || !state.result.rights || !state.result.provenance) {
+  if (!state.result.digitalEdition || !state.result.source || !state.result.rights || !state.result.provenance || !state.result.delivery) {
     return (
       <MessageScreen
         title="Open-edition check unavailable"
@@ -53,7 +64,17 @@ export function EditionResolutionFlow({
       />
     );
   }
-  return <Ready result={state.result} onScanAnother={onScanAnother} />;
+  return (
+    <Ready
+      result={state.result}
+      onScanAnother={onScanAnother}
+      exportState={exportState}
+      onExport={onExport}
+      onCancelExport={onCancelExport}
+      onRetryExport={onRetryExport}
+      onRefreshEdition={onRefreshEdition}
+    />
+  );
 }
 
 function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack(): void }) {
@@ -76,7 +97,23 @@ function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack
   );
 }
 
-function Ready({ result, onScanAnother }: { result: NonNullable<EditionState['result']>; onScanAnother(): void }) {
+function Ready({
+  result,
+  onScanAnother,
+  exportState,
+  onExport,
+  onCancelExport,
+  onRetryExport,
+  onRefreshEdition,
+}: {
+  result: NonNullable<EditionState['result']>;
+  onScanAnother(): void;
+  exportState: ExportState;
+  onExport(intent: ExportIntent): void;
+  onCancelExport(): void;
+  onRetryExport(): void;
+  onRefreshEdition(): void;
+}) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const digital = result.digitalEdition!;
   const source = result.source!;
@@ -106,8 +143,13 @@ function Ready({ result, onScanAnother }: { result: NonNullable<EditionState['re
           <Text style={styles.infoBody}>{physicalPublication || 'Edition details unavailable'}</Text>
           <Text style={styles.infoBody}>The open digital edition may differ from your physical edition.</Text>
         </View>
-        <DisabledAction label="Open in Books — available next phase" />
-        <DisabledAction label="Save to Files — available next phase" />
+        <ExportActions
+          state={exportState}
+          onExport={onExport}
+          onCancel={onCancelExport}
+          onRetry={onRetryExport}
+          onRefreshEdition={onRefreshEdition}
+        />
         <SecondaryButton
           label={detailsOpen ? 'Hide edition details' : 'Why this edition is available'}
           onPress={() => setDetailsOpen((open) => !open)}
@@ -130,11 +172,59 @@ function Ready({ result, onScanAnother }: { result: NonNullable<EditionState['re
   );
 }
 
-function DisabledAction({ label }: { label: string }) {
+function ExportActions({
+  state,
+  onExport,
+  onCancel,
+  onRetry,
+  onRefreshEdition,
+}: {
+  state: ExportState;
+  onExport(intent: ExportIntent): void;
+  onCancel(): void;
+  onRetry(): void;
+  onRefreshEdition(): void;
+}) {
+  if (state.status === 'downloading') {
+    const percentage = state.progress?.fraction === null || state.progress?.fraction === undefined
+      ? 'Preparing EPUB…'
+      : `${Math.round(state.progress.fraction * 100)}%`;
+    return (
+      <View style={styles.exportPanel}>
+        <Text style={styles.exportTitle}>Downloading verified EPUB</Text>
+        <Text style={styles.exportBody}>{percentage}</Text>
+        <SecondaryButton label="Cancel download" onPress={onCancel} />
+      </View>
+    );
+  }
+  if (state.status === 'sharing') {
+    const instruction = state.intent === 'files'
+      ? 'Choose Save to Files in the iOS share sheet.'
+      : 'Choose Books in the iOS share sheet.';
+    return (
+      <View style={styles.exportPanel}>
+        <Text style={styles.exportTitle}>Share sheet open</Text>
+        <Text style={styles.exportBody}>{instruction}</Text>
+      </View>
+    );
+  }
   return (
-    <Pressable accessibilityLabel={label} accessibilityRole="button" disabled style={styles.disabledAction}>
-      <Text style={styles.disabledActionText}>{label}</Text>
-    </Pressable>
+    <View style={styles.exportStack}>
+      {state.message && state.status !== 'error' ? <Text style={styles.exportBody}>{state.message}</Text> : null}
+      {state.status === 'error' ? (
+        <View style={styles.exportPanel}>
+          <Text style={styles.exportBody}>{state.message ?? 'The EPUB could not be prepared.'}</Text>
+          {state.code === 'expired' ? (
+            <PrimaryButton label="Check edition again" onPress={onRefreshEdition} />
+          ) : (
+            <SecondaryButton label="Try download again" onPress={onRetry} />
+          )}
+        </View>
+      ) : null}
+      <Text style={styles.exportHint}>One final tap in the iOS share sheet chooses Books or Save to Files.</Text>
+      <PrimaryButton label="Open in Books" onPress={() => onExport('books')} />
+      <SecondaryButton label="Save to Files" onPress={() => onExport('files')} />
+    </View>
   );
 }
 
@@ -182,8 +272,11 @@ const styles = StyleSheet.create({
   editionTitle: { color: '#1D241F', fontSize: 22, fontWeight: '700' },
   editionAuthor: { color: '#555A56', fontSize: 17 },
   source: { color: '#52705F', fontSize: 14, fontWeight: '700' },
-  disabledAction: { alignItems: 'center', backgroundColor: '#DFDDD6', borderRadius: 14, minHeight: 52, justifyContent: 'center', opacity: 0.72, paddingHorizontal: 18 },
-  disabledActionText: { color: '#686963', fontSize: 16, fontWeight: '600', textAlign: 'center' },
+  exportStack: { gap: 12 },
+  exportPanel: { backgroundColor: '#E8E5DC', borderRadius: 16, gap: 9, padding: 18 },
+  exportTitle: { color: '#1D241F', fontSize: 17, fontWeight: '700' },
+  exportBody: { color: '#60605A', fontSize: 15, lineHeight: 21 },
+  exportHint: { color: '#60605A', fontSize: 14, lineHeight: 20 },
   detailsCard: { backgroundColor: '#FFFFFF', borderRadius: 16, gap: 12, padding: 18 },
   detailRow: { flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
   detailLabel: { color: '#777871', fontSize: 14 },

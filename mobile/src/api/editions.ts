@@ -55,6 +55,15 @@ export type EditionProvenance = {
   epubcheckWarnings: string[];
 };
 
+export type EpubDeliveryInfo = {
+  downloadPath: '/editions/download';
+  downloadToken: string;
+  filename: string;
+  contentLength: number;
+  sha256: string;
+  expiresAt: string;
+};
+
 export type EditionResolutionResult = {
   status: 'ready' | 'unavailable';
   reason: string | null;
@@ -63,6 +72,7 @@ export type EditionResolutionResult = {
   source: EditionSourceInfo | null;
   rights: EditionRightsInfo | null;
   provenance: EditionProvenance | null;
+  delivery: EpubDeliveryInfo | null;
 };
 
 export type EditionClient = {
@@ -148,10 +158,10 @@ export function decodeEditionResolutionResult(value: unknown): EditionResolution
   }
   const physicalEdition = value.physicalEdition === null ? null : decodePhysical(value.physicalEdition);
   if (value.status === 'unavailable') {
-    if (value.digitalEdition !== null || value.source !== null || value.rights !== null || value.provenance !== null) {
+    if (value.digitalEdition !== null || value.source !== null || value.rights !== null || value.provenance !== null || value.delivery !== null) {
       throw new ContractError('Unavailable edition response contained delivery data');
     }
-    return { status: value.status, reason: value.reason, physicalEdition, digitalEdition: null, source: null, rights: null, provenance: null };
+    return { status: value.status, reason: value.reason, physicalEdition, digitalEdition: null, source: null, rights: null, provenance: null, delivery: null };
   }
   return {
     status: 'ready',
@@ -161,6 +171,7 @@ export function decodeEditionResolutionResult(value: unknown): EditionResolution
     source: decodeSource(value.source),
     rights: decodeRights(value.rights),
     provenance: decodeProvenance(value.provenance),
+    delivery: decodeDelivery(value.delivery),
   };
 }
 
@@ -201,9 +212,22 @@ function decodeProvenance(value: unknown): EditionProvenance {
   return value as EditionProvenance;
 }
 
+function decodeDelivery(value: unknown): EpubDeliveryInfo {
+  if (!isRecord(value) || value.downloadPath !== '/editions/download'
+    || typeof value.downloadToken !== 'string' || value.downloadToken.length < 40
+    || !isSafeEpubFilename(value.filename) || !isByteLength(value.contentLength)
+    || !isSha(value.sha256) || !isIsoDate(value.expiresAt)) {
+    throw new ContractError('EPUB delivery was invalid');
+  }
+  return value as EpubDeliveryInfo;
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> { return typeof value === 'object' && value !== null; }
 function isNullableString(value: unknown): value is string | null { return value === null || typeof value === 'string'; }
 function isStringArray(value: unknown): value is string[] { return Array.isArray(value) && value.every((item) => typeof item === 'string'); }
 function isStringRecord(value: unknown): value is Record<string, string> { return isRecord(value) && Object.values(value).every((item) => typeof item === 'string'); }
 function isSha(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
+function isSafeEpubFilename(value: unknown): value is string { return typeof value === 'string' && /^[A-Za-z0-9][A-Za-z0-9-]{0,120}\.epub$/.test(value); }
+function isByteLength(value: unknown): value is number { return typeof value === 'number' && Number.isInteger(value) && value > 0 && value <= 25_000_000; }
+function isIsoDate(value: unknown): value is string { return typeof value === 'string' && !Number.isNaN(Date.parse(value)); }
 function isStatus(value: unknown): value is EditionResolutionResult['status'] { return value === 'ready' || value === 'unavailable'; }

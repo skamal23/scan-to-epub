@@ -13,6 +13,7 @@ from book_backend.editions.service import (
     SourceUnavailable,
     ValidationFailed,
 )
+from book_backend.epubs.artifacts import EphemeralEpubStore
 from book_backend.epubs.validator import EpubcheckResult
 
 
@@ -68,6 +69,7 @@ async def test_supported_work_returns_a_separate_verified_digital_edition():
         catalog=catalog,
         acquirer=StubAcquirer(payload),
         validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
     )
 
     result = await service.resolve(request())
@@ -92,6 +94,7 @@ async def test_unsupported_work_returns_honest_unavailable_without_acquisition()
         catalog=STANDARD_EBOOKS_CATALOG,
         acquirer=acquirer,
         validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
     )
 
     result = await service.resolve(request("The Martian", ["Andy Weir"]))
@@ -107,6 +110,7 @@ async def test_source_outage_and_epubcheck_failure_are_not_misreported_as_unavai
         catalog=STANDARD_EBOOKS_CATALOG,
         acquirer=StubAcquirer(SourceUnavailable("offline")),
         validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
     )
     with pytest.raises(SourceUnavailable):
         await offline.resolve(request())
@@ -121,6 +125,7 @@ async def test_source_outage_and_epubcheck_failure_are_not_misreported_as_unavai
         catalog=catalog,
         acquirer=StubAcquirer(payload),
         validator=StubValidator(EpubcheckResult(version="5.3.0", valid=False, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
     )
     with pytest.raises(ValidationFailed):
         await invalid.resolve(request())
@@ -138,7 +143,34 @@ async def test_unavailable_epubcheck_is_reported_as_a_validation_failure():
         catalog=catalog,
         acquirer=StubAcquirer(payload),
         validator=StubValidator(RuntimeError("EPUBCheck is unavailable")),
+        artifact_store=EphemeralEpubStore(),
     )
 
     with pytest.raises(ValidationFailed, match="could not run"):
         await service.resolve(request())
+
+
+@pytest.mark.anyio
+async def test_verified_result_stages_the_exact_validated_epub_for_short_lived_delivery():
+    payload = epub_bytes()
+    entry = STANDARD_EBOOKS_CATALOG.find("Pride and Prejudice", ["Jane Austen"], None)
+    catalog = replace(
+        STANDARD_EBOOKS_CATALOG,
+        entries=(replace(entry, expected_sha256=hashlib.sha256(payload).hexdigest()),),
+    )
+    store = EphemeralEpubStore()
+    service = EditionResolutionService(
+        catalog=catalog,
+        acquirer=StubAcquirer(payload),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=store,
+    )
+
+    result = await service.resolve(request())
+
+    assert result.delivery is not None
+    assert result.delivery.filename == "Pride-and-Prejudice-Jane-Austen.epub"
+    assert result.delivery.sha256 == hashlib.sha256(payload).hexdigest()
+    artifact = await store.get(result.delivery.download_token)
+    assert artifact is not None
+    assert bytes(artifact.content) == payload

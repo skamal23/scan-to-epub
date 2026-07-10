@@ -1,0 +1,29 @@
+appId: host.exp.Exponent
+name: Phase 5 EPUB handoff
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Verified open edition
+    direction: DOWN
+- tapOn: Verified open edition
+- assertVisible: Verified open edition
+- scrollUntilVisible:
+    element:
+      text: Open in Books
+    direction: DOWN
+- tapOn: Open in Books
+- assertVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase5-share-sheet
+- tapOn:
+    point: 50%, 20%
+- assertVisible: EPUB is ready to share again.
+- takeScreenshot: .maestro/artifacts/phase5-returned
+- scrollUntilVisible:
+    element:
+      text: Scan another book
+    direction: DOWN
+- tapOn: Scan another book
+- assertVisible: Scan a cover or ISBN

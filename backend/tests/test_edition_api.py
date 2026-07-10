@@ -4,7 +4,10 @@ import pytest
 from book_backend.app import create_app
 from book_backend.config import Settings
 from book_backend.editions.errors import SourceUnavailable, ValidationFailed
+from book_backend.editions.fixtures import fixture_epub_bytes
 from book_backend.editions.models import EditionResolutionResult
+from book_backend.epubs.safety import inspect_epub
+from book_backend.epubs.validator import EpubcheckValidator
 
 
 class StubEditionService:
@@ -74,3 +77,38 @@ async def test_resolution_endpoint_maps_source_and_validation_failures(error, st
     assert response.status_code == status
     assert response.json()["detail"] == detail
     assert "private details" not in response.text
+
+
+@pytest.mark.anyio
+async def test_fixture_resolution_provides_a_short_lived_epub_for_simulator_export():
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post("/editions/resolve", json=request_body())
+        delivery = resolved.json()["delivery"]
+        downloaded = await client.get(
+            delivery["downloadPath"],
+            headers={"Authorization": f"Bearer {delivery['downloadToken']}"},
+        )
+
+    assert resolved.status_code == 200
+    assert resolved.json()["status"] == "ready"
+    assert resolved.json()["digitalEdition"]["title"] == "Pride and Prejudice (test export)"
+    assert resolved.json()["source"]["organization"] == "Deterministic test fixture"
+    assert "test-only" in resolved.json()["rights"]["rightsStatement"].lower()
+    assert delivery["filename"] == "Pride-and-Prejudice-test-export-Jane-Austen.epub"
+    assert downloaded.status_code == 200
+    assert downloaded.headers["x-content-sha256"] == delivery["sha256"]
+    assert downloaded.content.startswith(b"PK")
+
+
+@pytest.mark.anyio
+async def test_simulator_export_fixture_is_safe_and_epubcheck_valid():
+    content = fixture_epub_bytes()
+
+    inspection = inspect_epub(content)
+    validation = await EpubcheckValidator().validate(content)
+
+    assert inspection.package_path == "EPUB/package.opf"
+    assert validation.valid is True

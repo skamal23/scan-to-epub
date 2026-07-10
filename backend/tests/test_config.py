@@ -10,6 +10,7 @@ def test_settings_read_test_fixture_mode() -> None:
             "BOOK_FIXTURE_MODE": "true",
             "BOOK_COVER_MAX_BYTES": "2500000",
             "BOOK_COVER_TIMEOUT_SECONDS": "9.5",
+            "BOOK_EPUB_ARTIFACT_TTL_SECONDS": "900",
         }
     )
 
@@ -17,8 +18,14 @@ def test_settings_read_test_fixture_mode() -> None:
     assert settings.fixture_mode is True
     assert settings.cover_max_bytes == 2_500_000
     assert settings.cover_timeout_seconds == 9.5
+    assert settings.epub_artifact_ttl_seconds == 900
 
 
 def test_settings_reject_unknown_environment() -> None:
     with pytest.raises(ValueError, match="Unsupported environment"):
         Settings.from_env({"BOOK_ENVIRONMENT": "production-ish"})
+
+
+def test_settings_reject_nonpositive_epub_artifact_ttl() -> None:
+    with pytest.raises(ValueError, match="positive"):
+        Settings.from_env({"BOOK_EPUB_ARTIFACT_TTL_SECONDS": "0"})

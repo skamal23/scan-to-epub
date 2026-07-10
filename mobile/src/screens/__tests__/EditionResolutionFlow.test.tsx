@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import type { EditionResolutionResult } from '../../api/editions';
 import { metadataScenarios } from '../../dev/metadataScenarios';
 import type { EditionState } from '../../state/editionState';
+import { initialExportState, type ExportState } from '../../state/exportState';
 import { EditionResolutionFlow } from '../EditionResolutionFlow';
 
 
@@ -30,6 +31,11 @@ const ready: EditionResolutionResult = {
     retrievedAt: '2026-07-10T18:00:00Z', originalSha256: 'a'.repeat(64), finalSha256: 'a'.repeat(64),
     transformation: 'unchanged', epubcheckVersion: '5.3.0', epubcheckStatus: 'valid', epubcheckWarnings: [],
   },
+  delivery: {
+    downloadPath: '/editions/download', downloadToken: 'fixture-download-token-which-is-long-enough-to-be-opaque',
+    filename: 'Pride-and-Prejudice-Jane-Austen.epub', contentLength: 1234,
+    sha256: 'a'.repeat(64), expiresAt: '2026-07-10T18:10:00Z',
+  },
 };
 
 const props = {
@@ -37,6 +43,11 @@ const props = {
   onBack: jest.fn(),
   onRetry: jest.fn(),
   onScanAnother: jest.fn(),
+  exportState: initialExportState,
+  onExport: jest.fn(),
+  onCancelExport: jest.fn(),
+  onRetryExport: jest.fn(),
+  onRefreshEdition: jest.fn(),
 };
 
 test('searching state preserves the confirmed physical edition', () => {
@@ -56,7 +67,10 @@ test('ready state shows verified digital edition and auditable rights details', 
   expect(view.getByText('Verified open edition')).toBeTruthy();
   expect(view.getByText('Standard Ebooks')).toBeTruthy();
   expect(view.getByText(/may differ from your physical copy/i)).toBeTruthy();
-  expect(view.getByRole('button', { name: 'Open in Books — available next phase' })).toBeDisabled();
+  fireEvent.press(view.getByRole('button', { name: 'Open in Books' }));
+  expect(props.onExport).toHaveBeenCalledWith('books');
+  fireEvent.press(view.getByRole('button', { name: 'Save to Files' }));
+  expect(props.onExport).toHaveBeenCalledWith('files');
   fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
   expect(view.getByText('CC0 1.0 Universal')).toBeTruthy();
   expect(view.getByText('United States')).toBeTruthy();
@@ -64,10 +78,35 @@ test('ready state shows verified digital edition and auditable rights details', 
   expect(view.getByText(`SHA-256 ${'a'.repeat(12)}…`)).toBeTruthy();
 });
 
+test('shows download progress and lets the user cancel without leaving the confirmed edition', () => {
+  const exportState: ExportState = {
+    status: 'downloading', intent: 'books', file: null,
+    progress: { receivedBytes: 50, expectedBytes: 100, fraction: 0.5 }, message: null, code: null,
+  };
+  const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
+
+  expect(view.getByText('Downloading verified EPUB')).toBeTruthy();
+  expect(view.getByText('50%')).toBeTruthy();
+  fireEvent.press(view.getByRole('button', { name: 'Cancel download' }));
+  expect(props.onCancelExport).toHaveBeenCalled();
+});
+
+test('treats an expired delivery as a recheck of the same confirmed edition', () => {
+  const exportState: ExportState = {
+    status: 'error', intent: 'files', file: null, progress: null,
+    message: 'This download link expired. Check the edition again.', code: 'expired',
+  };
+  const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
+
+  expect(view.getByText('This download link expired. Check the edition again.')).toBeTruthy();
+  fireEvent.press(view.getByRole('button', { name: 'Check edition again' }));
+  expect(props.onRefreshEdition).toHaveBeenCalled();
+});
+
 test('unavailable and error states stay honest and recoverable', () => {
   const unavailable: EditionState = {
     status: 'resolved', message: null,
-    result: { status: 'unavailable', reason: 'No reviewed open edition is available for this work yet.', physicalEdition: null, digitalEdition: null, source: null, rights: null, provenance: null },
+    result: { status: 'unavailable', reason: 'No reviewed open edition is available for this work yet.', physicalEdition: null, digitalEdition: null, source: null, rights: null, provenance: null, delivery: null },
   };
   const first = render(<EditionResolutionFlow {...props} state={unavailable} />);
   expect(first.getByText('Book identified, open edition unavailable')).toBeTruthy();
