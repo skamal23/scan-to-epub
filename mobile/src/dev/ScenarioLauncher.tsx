@@ -9,6 +9,7 @@ import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { metadataScenarios } from './metadataScenarios';
 import {
   editionScenarioCandidate,
+  openLicenseFallbackScenario,
   unavailableEditionScenario,
 } from './editionScenarios';
 import { scannerFixtures } from './scannerFixtures';
@@ -143,6 +144,10 @@ export function ScenarioLauncher({
           <SecondaryButton
             label="Open edition unavailable"
             onPress={() => onEditionResult(editionScenarioCandidate, unavailableEditionScenario)}
+          />
+          <SecondaryButton
+            label="Open-license fallback details"
+            onPress={() => onEditionResult(editionScenarioCandidate, openLicenseFallbackScenario)}
           />
           <SecondaryButton
             label="Edition source offline"

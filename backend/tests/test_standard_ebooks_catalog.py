@@ -4,7 +4,10 @@ from book_backend.content_sources.standard_ebooks import STANDARD_EBOOKS_CATALOG
 def test_reviewed_catalog_has_five_pinned_unique_entries():
     assert len(STANDARD_EBOOKS_CATALOG.entries) == 5
     assert len({entry.entry_id for entry in STANDARD_EBOOKS_CATALOG.entries}) == 5
-    assert all(len(entry.expected_sha256) == 64 for entry in STANDARD_EBOOKS_CATALOG.entries)
+    assert all(
+        entry.download_policy.expected_sha256 and len(entry.download_policy.expected_sha256) == 64
+        for entry in STANDARD_EBOOKS_CATALOG.entries
+    )
     assert all(
         entry.acquisition_url.endswith("?source=download")
         for entry in STANDARD_EBOOKS_CATALOG.entries

@@ -31,7 +31,7 @@ export type DigitalEditionInfo = {
   language: string;
   identifier: string;
   publisher: string;
-  coverUrl: string;
+  coverUrl: string | null;
   isSamePublication: boolean;
 };
 
@@ -40,6 +40,7 @@ export type EditionRightsInfo = {
   licenseName: string;
   licenseUrl: string;
   rightsStatement: string;
+  attribution: string | null;
   territory: string;
 };
 export type EditionProvenance = {
@@ -53,6 +54,7 @@ export type EditionProvenance = {
   epubcheckVersion: string;
   epubcheckStatus: 'valid';
   epubcheckWarnings: string[];
+  sourceAttempts: string[];
 };
 
 export type EpubDeliveryInfo = {
@@ -186,7 +188,7 @@ function decodePhysical(value: unknown): PhysicalEditionInfo {
 function decodeDigital(value: unknown): DigitalEditionInfo {
   if (!isRecord(value) || typeof value.title !== 'string' || !isStringArray(value.authors)
     || typeof value.language !== 'string' || typeof value.identifier !== 'string'
-    || typeof value.publisher !== 'string' || typeof value.coverUrl !== 'string'
+    || typeof value.publisher !== 'string' || !isNullableString(value.coverUrl)
     || typeof value.isSamePublication !== 'boolean') throw new ContractError('Digital edition was invalid');
   return value as DigitalEditionInfo;
 }
@@ -198,7 +200,8 @@ function decodeSource(value: unknown): EditionSourceInfo {
 
 function decodeRights(value: unknown): EditionRightsInfo {
   if (!isRecord(value) || typeof value.licenseName !== 'string' || typeof value.licenseUrl !== 'string'
-    || typeof value.rightsStatement !== 'string' || typeof value.territory !== 'string') throw new ContractError('Edition rights were invalid');
+    || typeof value.rightsStatement !== 'string' || !isNullableString(value.attribution)
+    || typeof value.territory !== 'string') throw new ContractError('Edition rights were invalid');
   return value as EditionRightsInfo;
 }
 
@@ -208,7 +211,7 @@ function decodeProvenance(value: unknown): EditionProvenance {
     || typeof value.retrievedAt !== 'string' || !isSha(value.originalSha256)
     || !isSha(value.finalSha256) || value.transformation !== 'unchanged'
     || typeof value.epubcheckVersion !== 'string' || value.epubcheckStatus !== 'valid'
-    || !isStringArray(value.epubcheckWarnings)) throw new ContractError('Edition provenance was invalid');
+    || !isStringArray(value.epubcheckWarnings) || !isStringArray(value.sourceAttempts)) throw new ContractError('Edition provenance was invalid');
   return value as EditionProvenance;
 }
 

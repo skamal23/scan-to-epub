@@ -44,7 +44,7 @@ pnpm ios
 BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backend-run-live
 ```
 
-Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured.
+Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured; that key also enables the separate, strict Google public-domain EPUB resolver.
 
 Fixture mode is for automation only. Its download is explicitly labeled **Deterministic test fixture** and contains no source-book text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it downloads one of the reviewed Standard Ebooks editions, checks its pinned SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
 
@@ -73,6 +73,16 @@ The front-cover shutter crops and compresses the photo on the phone, uploads onl
 For the actual legal-book handoff on a phone, prefer `make backend-run-phone-live`. After a verified result, **Open in Books** and **Save to Files** both open iOS's native share sheet with an EPUB file; the user makes the final Books or Files choice. The app never silently inserts a file into Apple Books. It verifies the downloaded byte length and SHA-256 before handing the file off, and removes its temporary cache copy when the user scans another book.
 
 The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_API_URL`. The checked-in [render.yaml](./render.yaml) describes a reproducible development deployment for that path. Creating the hosted service is intentionally deferred until a remotely reachable backend is needed.
+
+## Approved source behavior
+
+- **Standard Ebooks** remains the first reviewed source for its curated public-domain/CC0 editions. Each enabled file has a pinned SHA-256 and does not permit redirects.
+- **OAPEN** has a reviewed CC BY EPUB path. The backend checks the OAPEN host, the file's pinned SHA-256, the OAPEN-supplied MD5, container safety, and EPUBCheck before delivery. If OAPEN does not authorize a reusable cover, the app deliberately shows a neutral placeholder.
+- **DOAB** is treated as a discovery directory, not a file host. Its reviewed record is retained separately from the final OAPEN file so provenance never implies that DOAB served the EPUB.
+- **Google Books** is considered only when its API response says `US`, `FULL_PUBLIC_DOMAIN`, `publicDomain: true`, `ALL_PAGES`, and supplies a non-ACS EPUB download. Samples, account-bound downloads, partial views, and non-Google download hosts are rejected. Its download may make one explicitly allowlisted Google-host redirect; the resulting file is still inspected and EPUBCheck-validated.
+- **Project Gutenberg** is never scraped from its main website at runtime. Its adapter accepts only a separately configured, reviewed HTTPS mirror/harvest manifest with pinned file hashes, preserving the included Project Gutenberg license. It is intentionally disabled until such a mirror is provisioned.
+
+The resolver automatically selects the highest-priority approved edition. When one approved edition fails before verification, it can try the next distinct reviewed source and records the source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
 
 ## Verification
 

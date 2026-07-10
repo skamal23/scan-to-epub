@@ -1,0 +1,40 @@
+appId: host.exp.Exponent
+name: Phase 6 approved-source fallback details
+---
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Open-license fallback details
+    direction: DOWN
+- tapOn: Open-license fallback details
+- assertVisible: Verified open edition
+- assertVisible: No reusable source cover
+- assertVisible: Checked the next approved source after an earlier edition could not be verified.
+- scrollUntilVisible:
+    element:
+      text: Why this edition is available
+    direction: DOWN
+- tapOn: Why this edition is available
+- scrollUntilVisible:
+    element:
+      text: CC BY 4.0
+    direction: DOWN
+- assertVisible: CC BY 4.0
+- assertVisible: Example Author, CC BY 4.0.
+- scrollUntilVisible:
+    element:
+      text: Sources checked
+    direction: DOWN
+- assertVisible: Sources checked
+- assertVisible: Deterministic open-license scenario
+- takeScreenshot: .maestro/artifacts/phase6-open-license-details
+- scrollUntilVisible:
+    element:
+      text: Scan another book
+    direction: DOWN
+- tapOn: Scan another book
+- assertVisible: Scan a cover or ISBN

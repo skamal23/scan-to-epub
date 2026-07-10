@@ -2,11 +2,11 @@ import hashlib
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
-from book_backend.content_sources.standard_ebooks import StandardEbookEntry
+from book_backend.content_sources.approved_catalog import ApprovedEpubEntry
 
 from .errors import SourceUnavailable, ValidationFailed
 from .models import AcquiredEpub
@@ -19,6 +19,7 @@ class DownloadResponse:
     content: bytes
     final_url: str
     redirected: bool
+    redirect_url: str | None = None
 
 
 class EpubFetcher(Protocol):
@@ -59,9 +60,10 @@ class HttpEpubFetcher:
                     content=bytes(body),
                     final_url=str(response.url),
                     redirected=response.is_redirect,
+                    redirect_url=response.headers.get("location") if response.is_redirect else None,
                 )
         except httpx.HTTPError as error:
-            raise SourceUnavailable("Standard Ebooks could not be reached") from error
+            raise SourceUnavailable("The approved EPUB source could not be reached") from error
 
 
 class SafeEpubAcquirer:
@@ -69,23 +71,57 @@ class SafeEpubAcquirer:
         self.fetcher = fetcher
         self.max_bytes = max_bytes
 
-    async def acquire(self, entry: StandardEbookEntry) -> AcquiredEpub:
-        response = await self.fetcher.fetch(entry.acquisition_url, self.max_bytes)
+    async def acquire(self, entry: ApprovedEpubEntry) -> AcquiredEpub:
+        url = entry.acquisition_url
+        redirects = 0
+        while True:
+            if not _is_allowed_https_url(url, entry):
+                raise ValidationFailed("The reviewed EPUB came from an unapproved host")
+            response = await self.fetcher.fetch(url, self.max_bytes)
+            if response.status in {301, 302, 303, 307, 308}:
+                if (
+                    not entry.download_policy.allow_redirects
+                    or response.redirect_url is None
+                    or redirects >= entry.download_policy.max_redirects
+                ):
+                    raise ValidationFailed("The reviewed EPUB unexpectedly redirected")
+                url = urljoin(url, response.redirect_url)
+                redirects += 1
+                continue
+            break
         if response.status != 200:
-            raise SourceUnavailable("Standard Ebooks did not return the reviewed file")
+            raise SourceUnavailable("The approved EPUB source did not return the reviewed file")
         if response.redirected:
             raise ValidationFailed("The reviewed EPUB unexpectedly redirected")
-        parsed = urlparse(response.final_url)
-        if parsed.scheme != "https" or parsed.hostname != "standardebooks.org":
+        if not _is_allowed_https_url(response.final_url, entry):
             raise ValidationFailed("The reviewed EPUB came from an unapproved host")
         content_type = response.content_type.partition(";")[0].strip().lower()
         if content_type != "application/epub+zip":
             raise ValidationFailed("The source response was not an EPUB")
         digest = hashlib.sha256(response.content).hexdigest()
-        if digest != entry.expected_sha256:
+        if (
+            entry.download_policy.expected_sha256 is not None
+            and digest != entry.download_policy.expected_sha256
+        ):
             raise ValidationFailed("The EPUB no longer matches its reviewed hash")
+        if (
+            entry.download_policy.expected_md5 is not None
+            and hashlib.md5(response.content).hexdigest() != entry.download_policy.expected_md5
+        ):
+            raise ValidationFailed("The EPUB no longer matches the source checksum")
         return AcquiredEpub(
             content=response.content,
             sha256=digest,
             retrieved_at=datetime.now(UTC),
         )
+
+
+def _is_allowed_https_url(url: str, entry: ApprovedEpubEntry) -> bool:
+    parsed = urlparse(url)
+    host = parsed.hostname.casefold() if parsed.hostname else None
+    return (
+        parsed.scheme == "https"
+        and host in entry.download_policy.allowed_hosts
+        and not parsed.username
+        and not parsed.password
+    )

@@ -127,7 +127,13 @@ function Ready({
         <Text style={styles.eyebrow}>VERIFIED OPEN EDITION</Text>
         <Text style={styles.title}>Verified open edition</Text>
         <View style={styles.editionCard}>
-          <Image source={{ uri: digital.coverUrl }} style={styles.cover} />
+          {digital.coverUrl ? (
+            <Image source={{ uri: digital.coverUrl }} style={styles.cover} />
+          ) : (
+            <View style={[styles.cover, styles.coverPlaceholder]}>
+              <Text style={styles.coverPlaceholderText}>No reusable source cover</Text>
+            </View>
+          )}
           <View style={styles.editionCopy}>
             <Text style={styles.editionTitle}>{digital.title}</Text>
             <Text style={styles.editionAuthor}>{digital.authors.join(', ')}</Text>
@@ -137,6 +143,11 @@ function Ready({
         <Text style={styles.body}>
           A legal open edition of this work is available. Its cover, introduction, notes, formatting, or pagination may differ from your physical copy.
         </Text>
+        {provenance.sourceAttempts.length > 1 ? (
+          <Text style={styles.sourceFallback}>
+            Checked the next approved source after an earlier edition could not be verified.
+          </Text>
+        ) : null}
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Work confirmed</Text>
           <Text style={styles.infoTitle}>Your physical edition</Text>
@@ -158,9 +169,11 @@ function Ready({
           <View style={styles.detailsCard}>
             <Detail label="Source" value={source.organization} />
             <Detail label="License" value={rights.licenseName} />
+            {rights.attribution ? <Detail label="Attribution" value={rights.attribution} /> : null}
             <Detail label="Territory" value={rights.territory === 'US' ? 'United States' : rights.territory} />
             <Detail label="File" value="Passed through unchanged" />
             <Detail label="Validation" value={`EPUBCheck ${provenance.epubcheckVersion} · Valid`} />
+            <Detail label="Sources checked" value={provenance.sourceAttempts.join(' → ')} />
             <Detail label="Reviewed" value={provenance.catalogReviewedAt} />
             <Text style={styles.hash}>SHA-256 {provenance.finalSha256.slice(0, 12)}…</Text>
             <Text style={styles.detailsBody}>{rights.rightsStatement}</Text>
@@ -268,10 +281,13 @@ const styles = StyleSheet.create({
   infoBody: { color: '#575750', fontSize: 15, lineHeight: 21 },
   editionCard: { backgroundColor: '#FFFFFF', borderRadius: 18, flexDirection: 'row', gap: 18, padding: 16 },
   cover: { backgroundColor: '#DEDCD5', borderRadius: 9, height: 168, width: 112 },
+  coverPlaceholder: { alignItems: 'center', justifyContent: 'center', padding: 12 },
+  coverPlaceholderText: { color: '#60605A', fontSize: 13, fontWeight: '600', lineHeight: 18, textAlign: 'center' },
   editionCopy: { flex: 1, gap: 8, justifyContent: 'center' },
   editionTitle: { color: '#1D241F', fontSize: 22, fontWeight: '700' },
   editionAuthor: { color: '#555A56', fontSize: 17 },
   source: { color: '#52705F', fontSize: 14, fontWeight: '700' },
+  sourceFallback: { color: '#52705F', fontSize: 14, fontWeight: '600', lineHeight: 20 },
   exportStack: { gap: 12 },
   exportPanel: { backgroundColor: '#E8E5DC', borderRadius: 16, gap: 9, padding: 18 },
   exportTitle: { color: '#1D241F', fontSize: 17, fontWeight: '700' },

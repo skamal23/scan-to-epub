@@ -42,7 +42,7 @@ class DigitalEditionInfo(APIModel):
     language: str
     identifier: str
     publisher: str
-    cover_url: str
+    cover_url: str | None
     is_same_publication: bool
 
 
@@ -55,6 +55,7 @@ class EditionRightsInfo(APIModel):
     license_name: str
     license_url: str
     rights_statement: str
+    attribution: str | None = None
     territory: str
 
 
@@ -69,6 +70,7 @@ class EditionProvenance(APIModel):
     epubcheck_version: str
     epubcheck_status: Literal["valid"]
     epubcheck_warnings: list[str]
+    source_attempts: list[str]
 
 
 class EpubDeliveryInfo(APIModel):

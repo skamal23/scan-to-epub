@@ -36,6 +36,7 @@ const readyResult = {
     licenseName: 'CC0 1.0 Universal',
     licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
     rightsStatement: 'Reviewed U.S. public-domain and CC0 edition.',
+    attribution: null,
     territory: 'US',
   },
   provenance: {
@@ -49,6 +50,7 @@ const readyResult = {
     epubcheckVersion: '5.3.0',
     epubcheckStatus: 'valid',
     epubcheckWarnings: [],
+    sourceAttempts: ['Standard Ebooks'],
   },
   delivery: {
     downloadPath: '/editions/download',
@@ -92,6 +94,16 @@ test('decodes complete ready and unavailable contracts', () => {
     .toThrow(ContractError);
   expect(() => decodeEditionResolutionResult({ ...readyResult, delivery: null }))
     .toThrow(ContractError);
+});
+
+
+test('accepts a verified edition without a reusable source cover', () => {
+  const noCover = {
+    ...readyResult,
+    digitalEdition: { ...readyResult.digitalEdition, coverUrl: null },
+  };
+
+  expect(decodeEditionResolutionResult(noCover).digitalEdition?.coverUrl).toBeNull();
 });
 
 

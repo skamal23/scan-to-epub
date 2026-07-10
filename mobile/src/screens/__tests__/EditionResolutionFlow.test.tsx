@@ -23,13 +23,13 @@ const ready: EditionResolutionResult = {
   source: { organization: 'Standard Ebooks', canonicalUrl: 'https://standardebooks.org/book' },
   rights: {
     licenseName: 'CC0 1.0 Universal', licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
-    rightsStatement: 'Reviewed public-domain edition.', territory: 'US',
+    rightsStatement: 'Reviewed public-domain edition.', attribution: 'Jane Austen, public domain.', territory: 'US',
   },
   provenance: {
     catalogEntryId: 'standardebooks:pride', catalogReviewedAt: '2026-07-10',
     acquisitionUrl: 'https://standardebooks.org/book.epub?source=download',
     retrievedAt: '2026-07-10T18:00:00Z', originalSha256: 'a'.repeat(64), finalSha256: 'a'.repeat(64),
-    transformation: 'unchanged', epubcheckVersion: '5.3.0', epubcheckStatus: 'valid', epubcheckWarnings: [],
+    transformation: 'unchanged', epubcheckVersion: '5.3.0', epubcheckStatus: 'valid', epubcheckWarnings: [], sourceAttempts: ['Standard Ebooks'],
   },
   delivery: {
     downloadPath: '/editions/download', downloadToken: 'fixture-download-token-which-is-long-enough-to-be-opaque',
@@ -76,6 +76,41 @@ test('ready state shows verified digital edition and auditable rights details', 
   expect(view.getByText('United States')).toBeTruthy();
   expect(view.getByText('EPUBCheck 5.3.0 · Valid')).toBeTruthy();
   expect(view.getByText(`SHA-256 ${'a'.repeat(12)}…`)).toBeTruthy();
+  expect(view.getByText('Jane Austen, public domain.')).toBeTruthy();
+});
+
+
+test('uses an explicit placeholder when the source does not authorize a reusable cover', () => {
+  const noCover: EditionResolutionResult = {
+    ...ready,
+    digitalEdition: { ...ready.digitalEdition!, coverUrl: null },
+  };
+  const view = render(
+    <EditionResolutionFlow
+      {...props}
+      state={{ status: 'resolved', result: noCover, message: null }}
+    />,
+  );
+
+  expect(view.getByText('No reusable source cover')).toBeTruthy();
+});
+
+
+test('explains a verified fallback without presenting a catalog chooser', () => {
+  const fallback: EditionResolutionResult = {
+    ...ready,
+    provenance: { ...ready.provenance!, sourceAttempts: ['Standard Ebooks', 'OAPEN'] },
+  };
+  const view = render(
+    <EditionResolutionFlow
+      {...props}
+      state={{ status: 'resolved', result: fallback, message: null }}
+    />,
+  );
+
+  expect(view.getByText('Checked the next approved source after an earlier edition could not be verified.')).toBeTruthy();
+  fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
+  expect(view.getByText('Standard Ebooks → OAPEN')).toBeTruthy();
 });
 
 test('shows download progress and lets the user cancel without leaving the confirmed edition', () => {

@@ -87,6 +87,7 @@ class FixtureEditionResolutionService:
                 epubcheck_version="5.3.0",
                 epubcheck_status="valid",
                 epubcheck_warnings=[],
+                source_attempts=["Deterministic test fixture"],
             ),
             delivery=EpubDeliveryInfo(
                 download_path=delivery.download_path,

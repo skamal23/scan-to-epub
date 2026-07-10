@@ -232,6 +232,18 @@ describe('<App />', () => {
     expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy();
   });
 
+  test('opens a deterministic open-license fallback-details scenario', async () => {
+    const view = render(<App client={healthyClient()} showScenarioLauncher />);
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Open-license fallback details' }));
+
+    expect(view.getByText('Checked the next approved source after an earlier edition could not be verified.')).toBeTruthy();
+    expect(view.getByText('No reusable source cover')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
+    expect(view.getByText('CC BY 4.0')).toBeTruthy();
+  });
+
   test('downloads a verified EPUB, opens the native handoff, and cleans the local copy before another scan', async () => {
     const start = jest.fn().mockResolvedValue({
       uri: 'file:///cache/Pride-and-Prejudice-Jane-Austen.epub',

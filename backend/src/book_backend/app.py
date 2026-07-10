@@ -6,7 +6,11 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request, Response
 
 from .config import Settings
-from .content_sources.standard_ebooks import STANDARD_EBOOKS_CATALOG
+from .content_sources.catalog import APPROVED_EPUB_CATALOG
+from .content_sources.google_books import (
+    GoogleBooksOpenEditionSource,
+    HttpGoogleBooksVolumeClient,
+)
 from .cover.comparison import HttpCoverComparator
 from .cover.models import CoverRecognitionResult
 from .cover.ocr import TesseractCoverOcr
@@ -80,11 +84,19 @@ def create_app(
                 if settings.contact_email
                 else "BookToEPUB/0.1"
             )
+            dynamic_sources = ()
+            if settings.google_books_api_key:
+                dynamic_sources = (
+                    GoogleBooksOpenEditionSource(
+                        client=HttpGoogleBooksVolumeClient(settings.google_books_api_key)
+                    ),
+                )
             edition_service = EditionResolutionService(
-                catalog=STANDARD_EBOOKS_CATALOG,
+                catalog=APPROVED_EPUB_CATALOG,
                 acquirer=SafeEpubAcquirer(HttpEpubFetcher(user_agent=user_agent)),
                 validator=EpubcheckValidator(),
                 artifact_store=epub_store,
+                dynamic_sources=dynamic_sources,
             )
 
     @app.middleware("http")

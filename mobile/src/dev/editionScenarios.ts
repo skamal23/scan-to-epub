@@ -32,6 +32,7 @@ export const readyEditionScenario: EditionResolutionResult = {
     licenseName: 'CC0 1.0 Universal',
     licenseUrl: 'https://creativecommons.org/publicdomain/zero/1.0/',
     rightsStatement: 'The text and cover are represented as U.S. public domain; Standard Ebooks dedicates its edition work via CC0.',
+    attribution: null,
     territory: 'US',
   },
   provenance: {
@@ -45,6 +46,7 @@ export const readyEditionScenario: EditionResolutionResult = {
     epubcheckVersion: '5.3.0',
     epubcheckStatus: 'valid',
     epubcheckWarnings: [],
+    sourceAttempts: ['Standard Ebooks'],
   },
   delivery: {
     downloadPath: '/editions/download',
@@ -65,6 +67,31 @@ export const unavailableEditionScenario: EditionResolutionResult = {
   rights: null,
   provenance: null,
   delivery: null,
+};
+
+export const openLicenseFallbackScenario: EditionResolutionResult = {
+  ...readyEditionScenario,
+  digitalEdition: {
+    ...readyEditionScenario.digitalEdition!,
+    title: 'Open-license example (test scenario)',
+    coverUrl: null,
+  },
+  source: {
+    organization: 'Deterministic open-license scenario',
+    canonicalUrl: 'https://example.invalid/open-license-scenario',
+  },
+  rights: {
+    licenseName: 'CC BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    rightsStatement: 'This development-only scenario exercises an open-license attribution state.',
+    attribution: 'Example Author, CC BY 4.0.',
+    territory: 'US',
+  },
+  provenance: {
+    ...readyEditionScenario.provenance!,
+    catalogEntryId: 'fixture:open-license-fallback',
+    sourceAttempts: ['Standard Ebooks', 'Deterministic open-license scenario'],
+  },
 };
 
 export const editionScenarioCandidate = candidate;
