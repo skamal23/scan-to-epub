@@ -47,9 +47,9 @@ The browser is not a substitute for the iOS app. Backend endpoints may be inspec
 
 ## Development and testing setup
 
-Full Xcode is not currently installed on this Mac; only Apple's command-line developer tools and Swift are present. Expo does not remove the need for Xcode when I need to run and control iOS Simulator. Before Phase 0 can finish, install the latest stable Xcode from the Mac App Store and open it once so it can install an iOS Simulator runtime.
+This Mac now has Xcode 26.6 and the iOS 26.5 Simulator runtime installed. Expo Go is installed in the iPhone 17 Pro Simulator, and the project can be launched there for automated and Computer Use validation.
 
-After Xcode is available, Expo CLI can install and launch Expo Go in Simulator with the project. The phone QR-code workflow remains available independently: the user installs Expo Go on the iPhone and scans the development QR code while the app remains compatible with Expo Go.
+The phone QR-code workflow remains available independently: the user installs Expo Go on the iPhone and scans the development QR code while the app remains compatible with Expo Go. A physical phone can reach the local backend over trusted Wi-Fi through the documented LAN configuration, or use the checked-in hosted-development configuration when HTTPS access is needed.
 
 A free Apple developer account is sufficient to test the app directly on your own iPhone through Xcode. A paid Apple Developer Program membership is only needed when we want TestFlight or App Store distribution. Apple currently documents both the free on-device testing path and the paid TestFlight/distribution path on its [Developer Program page](https://developer.apple.com/programs/).
 

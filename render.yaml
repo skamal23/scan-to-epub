@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: book-to-epub-backend-dev
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install .
+    startCommand: uvicorn book_backend.app:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: BOOK_ENVIRONMENT
+        value: development
+      - key: BOOK_FIXTURE_MODE
+        value: "true"
+      - key: PYTHON_VERSION
+        value: 3.12.13

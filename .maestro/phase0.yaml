@@ -1,0 +1,27 @@
+appId: host.exp.Exponent
+name: Phase 0 foundation flow
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Open scanner
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Book scan guide
+- takeScreenshot: .maestro/artifacts/phase0-scanner
+- tapOn: Back
+- assertVisible: Book to EPUB
+- tapOn: Test scenarios
+- assertVisible: Scenario launcher
+- tapOn: Offline
+- assertVisible: Backend unavailable
+- assertVisible: Retry connection
+- tapOn: Retry connection
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- tapOn: Timeout
+- assertVisible: Connection timed out
+- tapOn: Retry connection
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- tapOn: Loading
+- assertVisible: Checking backend…
+- takeScreenshot: .maestro/artifacts/phase0-loading

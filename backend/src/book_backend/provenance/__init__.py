@@ -1,0 +1,1 @@
+"""Result provenance boundary."""
