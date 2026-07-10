@@ -6,10 +6,17 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request
 
 from .config import Settings
+from .content_sources.standard_ebooks import STANDARD_EBOOKS_CATALOG
 from .cover.comparison import HttpCoverComparator
 from .cover.models import CoverRecognitionResult
 from .cover.ocr import TesseractCoverOcr
 from .cover.service import CoverRecognitionService
+from .editions.acquisition import HttpEpubFetcher, SafeEpubAcquirer
+from .editions.errors import SourceUnavailable, ValidationFailed
+from .editions.fixtures import FixtureEditionResolutionService
+from .editions.models import EditionResolutionResult, EditionResolveRequest
+from .editions.service import EditionResolutionService
+from .epubs.validator import EpubcheckValidator
 from .metadata.models import MetadataSearchRequest, MetadataSearchResult
 from .metadata.providers import (
     FixtureFailureProvider,
@@ -26,10 +33,15 @@ class CoverRecognizer(Protocol):
     async def recognize(self, image_bytes: bytes) -> CoverRecognitionResult: ...
 
 
+class EditionResolver(Protocol):
+    async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult: ...
+
+
 def create_app(
     settings: Settings,
     metadata_service: MetadataSearchService | None = None,
     cover_recognizer: CoverRecognizer | None = None,
+    edition_service: EditionResolver | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Book Backend", version="0.1.0")
     if metadata_service is None:
@@ -56,6 +68,20 @@ def create_app(
             metadata=metadata_service,
             comparator=HttpCoverComparator(),
         )
+    if edition_service is None:
+        if settings.fixture_mode:
+            edition_service = FixtureEditionResolutionService()
+        else:
+            user_agent = (
+                f"BookToEPUB/0.1 ({settings.contact_email})"
+                if settings.contact_email
+                else "BookToEPUB/0.1"
+            )
+            edition_service = EditionResolutionService(
+                catalog=STANDARD_EBOOKS_CATALOG,
+                acquirer=SafeEpubAcquirer(HttpEpubFetcher(user_agent=user_agent)),
+                validator=EpubcheckValidator(),
+            )
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
@@ -119,6 +145,21 @@ def create_app(
             ) from error
         finally:
             image_bytes.clear()
+
+    @app.post("/editions/resolve", response_model=EditionResolutionResult)
+    async def resolve_edition(request: EditionResolveRequest) -> EditionResolutionResult:
+        try:
+            return await edition_service.resolve(request)
+        except SourceUnavailable as error:
+            raise HTTPException(
+                status_code=503,
+                detail="The open-edition source is unavailable",
+            ) from error
+        except ValidationFailed as error:
+            raise HTTPException(
+                status_code=502,
+                detail="The open edition could not be verified",
+            ) from error
 
     return app
 

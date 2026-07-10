@@ -1,0 +1,57 @@
+appId: host.exp.Exponent
+name: Phase 4 rights-aware edition resolution
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Verified open edition
+    direction: DOWN
+- tapOn: Verified open edition
+- assertVisible: Verified open edition
+- assertVisible: Standard Ebooks
+- assertVisible: The open digital edition may differ.*
+- assertVisible: Open in Books — available next phase
+- assertVisible: Save to Files — available next phase
+- scrollUntilVisible:
+    element:
+      text: Why this edition is available
+    direction: DOWN
+- tapOn: Why this edition is available
+- scrollUntilVisible:
+    element:
+      text: CC0 1.0 Universal
+    direction: DOWN
+- assertVisible: CC0 1.0 Universal
+- assertVisible: United States
+- scrollUntilVisible:
+    element:
+      text: EPUBCheck 5.3.0 · Valid
+    direction: DOWN
+- assertVisible: Passed through unchanged
+- takeScreenshot: .maestro/artifacts/phase4-verified
+- tapOn: Scan another book
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Open edition unavailable
+    direction: DOWN
+- tapOn: Open edition unavailable
+- assertVisible: Book identified, open edition unavailable
+- assertVisible: No reviewed open edition is available.*
+- takeScreenshot: .maestro/artifacts/phase4-unavailable
+- tapOn: Scan another book
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Edition source offline
+    direction: DOWN
+- tapOn: Edition source offline
+- assertVisible: Open-edition check unavailable
+- assertVisible: Open-edition source is temporarily unavailable
+- tapOn: Try source check again
+- assertVisible: Verified open edition
+- takeScreenshot: .maestro/artifacts/phase4-retry

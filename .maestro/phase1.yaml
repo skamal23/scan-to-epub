@@ -17,9 +17,13 @@ name: Phase 1 manual identification flow
 - assertVisible: Work confirmed
 - assertVisible: Your physical edition
 - assertVisible: The open digital edition may differ.*
+- assertVisible: Verified open edition
 - takeScreenshot: .maestro/artifacts/phase1-confirmed
-- tapOn: Edit search
-- tapOn: Back
+- scrollUntilVisible:
+    element:
+      text: Scan another book
+    direction: DOWN
+- tapOn: Scan another book
 - tapOn: Back
 - tapOn: Test scenarios
 - scrollUntilVisible:

@@ -3,9 +3,15 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MetadataCandidate, MetadataQuery } from '../api/metadata';
+import type { EditionResolutionResult } from '../api/editions';
 import type { ScannerFixture } from '../scanner/ScannerScreen';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { metadataScenarios } from './metadataScenarios';
+import {
+  editionScenarioCandidate,
+  readyEditionScenario,
+  unavailableEditionScenario,
+} from './editionScenarios';
 import { scannerFixtures } from './scannerFixtures';
 
 export function ScenarioLauncher({
@@ -17,6 +23,8 @@ export function ScenarioLauncher({
   onSearchError,
   onScannerFixture,
   onTimeout,
+  onEditionResult,
+  onEditionError,
 }: {
   onBack(): void;
   onCandidates(candidates: MetadataCandidate[], providerFailures?: string[]): void;
@@ -26,6 +34,8 @@ export function ScenarioLauncher({
   onSearchError(retryQuery: MetadataQuery): void;
   onScannerFixture(fixture: ScannerFixture): void;
   onTimeout(): void;
+  onEditionResult(candidate: MetadataCandidate, result: EditionResolutionResult): void;
+  onEditionError(candidate: MetadataCandidate, message: string): void;
 }) {
   return (
     <SafeAreaView style={styles.screen}>
@@ -122,6 +132,25 @@ export function ScenarioLauncher({
             onPress={() => onCandidates(metadataScenarios.longTitle)}
           />
           <SecondaryButton label="Back" onPress={onBack} />
+        </View>
+        <Text style={styles.sectionLabel}>OPEN EDITION</Text>
+        <View style={styles.buttonStack}>
+          <SecondaryButton
+            label="Verified open edition"
+            onPress={() => onEditionResult(editionScenarioCandidate, readyEditionScenario)}
+          />
+          <SecondaryButton
+            label="Open edition unavailable"
+            onPress={() => onEditionResult(editionScenarioCandidate, unavailableEditionScenario)}
+          />
+          <SecondaryButton
+            label="Edition source offline"
+            onPress={() => onEditionError(editionScenarioCandidate, 'Open-edition source is temporarily unavailable')}
+          />
+          <SecondaryButton
+            label="EPUB validation failed"
+            onPress={() => onEditionError(editionScenarioCandidate, 'The open edition could not be verified')}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>

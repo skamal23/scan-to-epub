@@ -8,7 +8,7 @@ An Expo iPhone app and a small FastAPI service for identifying a physical book a
 - pnpm 11.7
 - Python 3.12
 - Tesseract 5 for deterministic front-cover OCR
-- Java 21 for EPUBCheck in later phases
+- Java 21 and EPUBCheck 5.3 for EPUB validation
 - Xcode with an iOS Simulator runtime
 
 ## First setup
@@ -16,7 +16,7 @@ An Expo iPhone app and a small FastAPI service for identifying a physical book a
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -e './backend[dev]'
-brew install -y tesseract
+brew install -y tesseract epubcheck
 cd mobile
 pnpm install --frozen-lockfile
 ```

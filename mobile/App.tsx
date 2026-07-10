@@ -11,6 +11,11 @@ import { createBackendClient, type BackendClient } from './src/api/health';
 import type { CoverClient, CoverRecognitionResult } from './src/api/cover';
 import { createExpoCoverClient } from './src/api/coverRuntime';
 import {
+  createEditionClient,
+  requestForCandidate,
+  type EditionClient,
+} from './src/api/editions';
+import {
   createMetadataClient,
   type MetadataClient,
   type MetadataQuery,
@@ -18,9 +23,11 @@ import {
 import { resolveEnvironment } from './src/config/environment';
 import { ScenarioLauncher } from './src/dev/ScenarioLauncher';
 import { ManualSearchFlow } from './src/screens/ManualSearchFlow';
+import { EditionResolutionFlow } from './src/screens/EditionResolutionFlow';
 import { ScannerScreen, type ScannerFixture } from './src/scanner/ScannerScreen';
 import { appReducer, initialAppState } from './src/state/appState';
 import { initialSearchState, searchReducer } from './src/state/searchState';
+import { editionReducer, initialEditionState } from './src/state/editionState';
 import {
   PrimaryButton,
   SecondaryButton,
@@ -31,6 +38,7 @@ export type AppProps = {
   client?: BackendClient;
   metadataClient?: MetadataClient;
   coverClient?: CoverClient;
+  editionClient?: EditionClient;
   showScenarioLauncher?: boolean;
 };
 
@@ -52,18 +60,27 @@ const liveMetadataClient = createMetadataClient({
 });
 
 const liveCoverClient = createExpoCoverClient(environment.apiUrl);
+const liveEditionClient = createEditionClient({
+  baseUrl: environment.apiUrl,
+  fetcher: fetch,
+  timeoutMs: 35_000,
+});
 
 export default function App({
   client = liveClient,
   metadataClient = liveMetadataClient,
   coverClient = liveCoverClient,
+  editionClient = liveEditionClient,
   showScenarioLauncher = __DEV__,
 }: AppProps) {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [searchState, dispatchSearch] = useReducer(searchReducer, initialSearchState);
+  const [editionState, dispatchEdition] = useReducer(editionReducer, initialEditionState);
   const searchGeneration = useRef(0);
   const lastQuery = useRef<MetadataQuery | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
+  const activeEdition = useRef<AbortController | null>(null);
+  const selectedCandidate = useRef<import('./src/api/metadata').MetadataCandidate | null>(null);
   const [scannerFixture, setScannerFixture] = useState<ScannerFixture | undefined>();
   const [identificationOrigin, setIdentificationOrigin] = useState<'manual' | 'isbn' | 'cover'>('manual');
   const [coverConfidence, setCoverConfidence] = useState<'high' | 'medium' | 'low'>('low');
@@ -126,6 +143,25 @@ export default function App({
     }
   }, [search]);
 
+  const resolveEdition = useCallback(async (candidate: import('./src/api/metadata').MetadataCandidate) => {
+    activeEdition.current?.abort();
+    const controller = new AbortController();
+    activeEdition.current = controller;
+    selectedCandidate.current = candidate;
+    dispatchEdition({ type: 'started' });
+    dispatch({ type: 'showEdition' });
+    try {
+      const result = await editionClient.resolve(requestForCandidate(candidate), controller.signal);
+      if (activeEdition.current !== controller) return;
+      dispatchEdition({ type: 'succeeded', result });
+    } catch (error) {
+      if (activeEdition.current !== controller) return;
+      dispatchEdition({ type: 'failed', message: error instanceof Error ? error.message : 'Open-edition check failed' });
+    } finally {
+      if (activeEdition.current === controller) activeEdition.current = null;
+    }
+  }, [editionClient]);
+
   useEffect(() => {
     void checkHealth();
   }, [checkHealth]);
@@ -172,7 +208,10 @@ export default function App({
         state={searchState}
         onBack={() => dispatch({ type: 'showScanner' })}
         onCancel={cancelSearch}
-        onConfirm={(candidate) => dispatchSearch({ type: 'confirmed', candidate })}
+        onConfirm={(candidate) => {
+          dispatchSearch({ type: 'confirmed', candidate });
+          void resolveEdition(candidate);
+        }}
         onEdit={() => {
           if (identificationOrigin === 'cover') {
             cancelSearch();
@@ -185,6 +224,31 @@ export default function App({
         onSearch={(query) => void search(query)}
         origin={identificationOrigin}
         recognitionConfidence={identificationOrigin === 'cover' ? coverConfidence : undefined}
+      />
+    );
+  }
+
+  if (state.screen === 'edition' && selectedCandidate.current) {
+    return (
+      <EditionResolutionFlow
+        candidate={selectedCandidate.current}
+        state={editionState}
+        onBack={() => {
+          activeEdition.current?.abort();
+          activeEdition.current = null;
+          dispatch({ type: 'showManualSearch' });
+        }}
+        onRetry={() => {
+          if (selectedCandidate.current) void resolveEdition(selectedCandidate.current);
+        }}
+        onScanAnother={() => {
+          activeEdition.current?.abort();
+          activeEdition.current = null;
+          selectedCandidate.current = null;
+          dispatchEdition({ type: 'reset' });
+          dispatchSearch({ type: 'reset' });
+          dispatch({ type: 'showScanner' });
+        }}
       />
     );
   }
@@ -213,6 +277,18 @@ export default function App({
           dispatch({ type: 'showScanner' });
         }}
         onTimeout={() => dispatch({ type: 'healthFailed', message: 'Connection timed out' })}
+        onEditionResult={(candidate, result) => {
+          selectedCandidate.current = candidate;
+          dispatchSearch({ type: 'confirmed', candidate });
+          dispatchEdition({ type: 'succeeded', result });
+          dispatch({ type: 'showEdition' });
+        }}
+        onEditionError={(candidate, message) => {
+          selectedCandidate.current = candidate;
+          dispatchSearch({ type: 'confirmed', candidate });
+          dispatchEdition({ type: 'failed', message });
+          dispatch({ type: 'showEdition' });
+        }}
       />
     );
   }

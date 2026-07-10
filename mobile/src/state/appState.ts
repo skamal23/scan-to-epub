@@ -1,5 +1,5 @@
 export type AppState = {
-  screen: 'launch' | 'scanner' | 'manualSearch' | 'scenarios';
+  screen: 'launch' | 'scanner' | 'manualSearch' | 'edition' | 'scenarios';
   connectivity: 'checking' | 'online' | 'offline';
   message: string;
 };
@@ -10,6 +10,7 @@ export type AppAction =
   | { type: 'healthFailed'; message: string }
   | { type: 'showScanner' }
   | { type: 'showManualSearch' }
+  | { type: 'showEdition' }
   | { type: 'showScenarios' }
   | { type: 'showLaunch' };
 
@@ -43,6 +44,8 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       return { ...state, screen: 'scanner' };
     case 'showManualSearch':
       return { ...state, screen: 'manualSearch' };
+    case 'showEdition':
+      return { ...state, screen: 'edition' };
     case 'showScenarios':
       return { ...state, screen: 'scenarios' };
     case 'showLaunch':

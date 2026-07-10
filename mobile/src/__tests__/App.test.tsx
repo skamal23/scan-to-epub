@@ -26,6 +26,8 @@ import type {
   MetadataClient,
   MetadataSearchResult,
 } from '../api/metadata';
+import type { EditionClient } from '../api/editions';
+import { readyEditionScenario } from '../dev/editionScenarios';
 
 const healthyClient = (): BackendClient => ({
   checkHealth: jest.fn().mockResolvedValue({
@@ -169,13 +171,15 @@ describe('<App />', () => {
     );
   });
 
-  test('searches by ISBN and confirms the work without claiming an edition match', async () => {
+  test('searches by ISBN and resolves a separate verified open edition', async () => {
     const dismissKeyboard = jest.spyOn(Keyboard, 'dismiss').mockImplementation(() => undefined);
     const metadata = metadataClient({ candidates: [prideCandidate], providerFailures: [] });
+    const editions: EditionClient = { resolve: jest.fn().mockResolvedValue(readyEditionScenario) };
     const view = render(
       <App
         client={healthyClient()}
         metadataClient={metadata}
+        editionClient={editions}
         showScenarioLauncher={false}
       />,
     );
@@ -193,11 +197,48 @@ describe('<App />', () => {
       expect.anything(),
     );
     fireEvent.press(view.getByRole('button', { name: 'Choose Pride and Prejudice by Jane Austen' }));
+    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
     expect(view.getByText('Work confirmed')).toBeTruthy();
     expect(view.getByText('Your physical edition')).toBeTruthy();
     expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
     expect(view.getByText(/open digital edition may differ/i)).toBeTruthy();
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        workTitle: 'Pride and Prejudice',
+        physicalIsbn13: '9780141439518',
+        territory: 'US',
+      }),
+      expect.anything(),
+    );
     dismissKeyboard.mockRestore();
+  });
+
+  test('opens deterministic verified and unavailable edition scenarios', async () => {
+    const view = render(<App client={healthyClient()} showScenarioLauncher />);
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
+    expect(view.getByText('Verified open edition')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Scan another book' }));
+    fireEvent.press(view.getByRole('button', { name: 'Back' }));
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Open edition unavailable' }));
+    expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy();
+  });
+
+  test('retries a deterministic source outage without rescanning', async () => {
+    const editions: EditionClient = { resolve: jest.fn().mockResolvedValue(readyEditionScenario) };
+    const view = render(
+      <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Edition source offline' }));
+    expect(view.getByText('Open-edition check unavailable')).toBeTruthy();
+
+    fireEvent.press(view.getByRole('button', { name: 'Try source check again' }));
+    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledTimes(1);
   });
 
   test('shows an honest empty result and lets the user edit the search', async () => {
