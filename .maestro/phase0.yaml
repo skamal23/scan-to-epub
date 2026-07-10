@@ -4,8 +4,7 @@ name: Phase 0 foundation flow
 - assertVisible: Book to EPUB
 - assertVisible: Backend connected
 - tapOn: Open scanner
-- assertVisible: Scan a cover or ISBN
-- assertVisible: Book scan guide
+- assertVisible: Search manually
 - takeScreenshot: .maestro/artifacts/phase0-scanner
 - tapOn: Back
 - assertVisible: Book to EPUB

@@ -3,8 +3,10 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MetadataCandidate, MetadataQuery } from '../api/metadata';
+import type { ScannerFixture } from '../scanner/ScannerScreen';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { metadataScenarios } from './metadataScenarios';
+import { scannerFixtures } from './scannerFixtures';
 
 export function ScenarioLauncher({
   onBack,
@@ -13,6 +15,7 @@ export function ScenarioLauncher({
   onLoading,
   onOffline,
   onSearchError,
+  onScannerFixture,
   onTimeout,
 }: {
   onBack(): void;
@@ -21,6 +24,7 @@ export function ScenarioLauncher({
   onLoading(): void;
   onOffline(): void;
   onSearchError(retryQuery: MetadataQuery): void;
+  onScannerFixture(fixture: ScannerFixture): void;
   onTimeout(): void;
 }) {
   return (
@@ -36,6 +40,37 @@ export function ScenarioLauncher({
           <SecondaryButton label="Loading" onPress={onLoading} />
           <SecondaryButton label="Offline" onPress={onOffline} />
           <SecondaryButton label="Timeout" onPress={onTimeout} />
+        </View>
+        <Text style={styles.sectionLabel}>ISBN SCANNER</Text>
+        <View style={styles.buttonStack}>
+          <SecondaryButton
+            label="Camera permission prompt"
+            onPress={() => onScannerFixture(scannerFixtures.permissionPrompt)}
+          />
+          <SecondaryButton
+            label="Camera permission denied"
+            onPress={() => onScannerFixture(scannerFixtures.permissionDenied)}
+          />
+          <SecondaryButton
+            label="Camera permission blocked"
+            onPress={() => onScannerFixture(scannerFixtures.permissionBlocked)}
+          />
+          <SecondaryButton
+            label="Invalid ISBN"
+            onPress={() => onScannerFixture(scannerFixtures.invalid)}
+          />
+          <SecondaryButton
+            label="Unstable ISBN"
+            onPress={() => onScannerFixture(scannerFixtures.unstable)}
+          />
+          <SecondaryButton
+            label="Single ISBN"
+            onPress={() => onScannerFixture(scannerFixtures.singleValid)}
+          />
+          <SecondaryButton
+            label="Repeated ISBN"
+            onPress={() => onScannerFixture(scannerFixtures.repeatedValid)}
+          />
         </View>
         <Text style={styles.sectionLabel}>BOOK SEARCH</Text>
         <View style={styles.buttonStack}>

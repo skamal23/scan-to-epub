@@ -1,3 +1,5 @@
+import logging
+
 import pytest
 
 from book_backend.metadata.models import BookRecord, MetadataQuery
@@ -97,6 +99,20 @@ async def test_search_falls_back_when_one_provider_fails() -> None:
 
     assert [candidate.work.title for candidate in result.candidates] == ["Pride and Prejudice"]
     assert result.provider_failures == ["google_books"]
+
+
+@pytest.mark.anyio
+async def test_provider_failure_log_names_provider_without_query_data(caplog) -> None:
+    caplog.set_level(logging.WARNING, logger="book_backend.metadata")
+    service = MetadataSearchService(
+        providers=[FakeProvider("google_books", [], error=RuntimeError("9780141439518 secret"))]
+    )
+
+    await service.search(MetadataQuery(isbn="9780141439518"))
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages == ["metadata provider failed: google_books"]
+    assert all("9780141439518" not in message and "secret" not in message for message in messages)
 
 
 @pytest.mark.anyio

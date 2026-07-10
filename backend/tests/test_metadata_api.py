@@ -31,6 +31,7 @@ async def test_fixture_isbn_search_returns_separate_work_and_edition(
     assert candidate["work"]["firstPublishedYear"] == 1813
     assert candidate["edition"]["isbn13"] == "9780141439518"
     assert candidate["edition"]["publisher"] == "Penguin Classics"
+    assert payload["observedIsbn"] == "9780141439518"
 
 
 @pytest.mark.anyio

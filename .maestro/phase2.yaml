@@ -1,0 +1,64 @@
+appId: host.exp.Exponent
+name: Phase 2 ISBN scanner states
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Camera permission prompt
+    direction: DOWN
+- tapOn: Camera permission prompt
+- assertVisible: Scan ISBN barcodes
+- assertVisible: Allow camera
+- assertVisible: Search manually
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Camera permission blocked
+    direction: DOWN
+- tapOn: Camera permission blocked
+- assertVisible: Camera access is blocked
+- assertVisible: Open Settings
+- assertVisible: Search manually
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Invalid ISBN
+    direction: DOWN
+- tapOn: Invalid ISBN
+- assertVisible: That barcode is not a valid ISBN.
+- assertVisible: ISBN scan guide
+- takeScreenshot: .maestro/artifacts/phase2-invalid
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Unstable ISBN
+    direction: DOWN
+- tapOn: Unstable ISBN
+- assertVisible: Barcode changed. Hold one ISBN steady.
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Single ISBN
+    direction: DOWN
+- tapOn: Single ISBN
+- assertVisible: ISBN found. Hold steady…
+- tapOn: Capture detected ISBN
+- assertVisible: Is this the right book?
+- tapOn: Edit search
+- tapOn: Back
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Repeated ISBN
+    direction: DOWN
+- tapOn: Repeated ISBN
+- assertVisible: Is this the right book?
+- assertVisible: Choose Pride and Prejudice by Jane Austen
+- takeScreenshot: .maestro/artifacts/phase2-result

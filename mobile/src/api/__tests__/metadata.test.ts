@@ -6,6 +6,7 @@ import {
 } from '../metadata';
 
 const result: MetadataSearchResult = {
+  observedIsbn: '9780141439518',
   candidates: [
     {
       candidateId: 'candidate-1',

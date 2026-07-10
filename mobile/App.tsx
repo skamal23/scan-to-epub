@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import {
   StyleSheet,
   Text,
@@ -16,6 +16,7 @@ import {
 import { resolveEnvironment } from './src/config/environment';
 import { ScenarioLauncher } from './src/dev/ScenarioLauncher';
 import { ManualSearchFlow } from './src/screens/ManualSearchFlow';
+import { ScannerScreen, type ScannerFixture } from './src/scanner/ScannerScreen';
 import { appReducer, initialAppState } from './src/state/appState';
 import { initialSearchState, searchReducer } from './src/state/searchState';
 import {
@@ -57,6 +58,7 @@ export default function App({
   const searchGeneration = useRef(0);
   const lastQuery = useRef<MetadataQuery | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
+  const [scannerFixture, setScannerFixture] = useState<ScannerFixture | undefined>();
 
   const checkHealth = useCallback(async () => {
     dispatch({ type: 'healthChecking' });
@@ -122,39 +124,23 @@ export default function App({
 
   if (state.screen === 'scanner') {
     return (
-      <SafeAreaView style={styles.scannerScreen}>
-        <StatusBar style="light" />
-        <View style={styles.scannerHeader}>
-          <SecondaryButton
-            appearance="onDark"
-            compact
-            label="Back"
-            onPress={() => dispatch({ type: 'showLaunch' })}
-          />
-          <Text style={styles.scannerTitle}>Scan a cover or ISBN</Text>
-          <Text style={styles.scannerHint}>Camera support arrives in Phase 2.</Text>
-        </View>
-        <View
-          accessible
-          accessibilityLabel="Book scan guide"
-          style={styles.scanGuide}
-        >
-          <View style={[styles.corner, styles.topLeft]} />
-          <View style={[styles.corner, styles.topRight]} />
-          <View style={[styles.corner, styles.bottomLeft]} />
-          <View style={[styles.corner, styles.bottomRight]} />
-        </View>
-        <View style={styles.scannerActions}>
-          <SecondaryButton
-            appearance="onDark"
-            label="Search manually"
-            onPress={() => {
-              dispatchSearch({ type: 'reset' });
-              dispatch({ type: 'showManualSearch' });
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <ScannerScreen
+        fixture={scannerFixture}
+        onBack={() => {
+          setScannerFixture(undefined);
+          dispatch({ type: 'showLaunch' });
+        }}
+        onIsbnAccepted={(isbn) => {
+          setScannerFixture(undefined);
+          dispatch({ type: 'showManualSearch' });
+          void search({ isbn });
+        }}
+        onManualSearch={() => {
+          setScannerFixture(undefined);
+          dispatchSearch({ type: 'reset' });
+          dispatch({ type: 'showManualSearch' });
+        }}
+      />
     );
   }
 
@@ -191,6 +177,10 @@ export default function App({
           dispatchSearch({ type: 'failed', message: 'Book search is temporarily unavailable' });
           dispatch({ type: 'showManualSearch' });
         }}
+        onScannerFixture={(fixture) => {
+          setScannerFixture(fixture);
+          dispatch({ type: 'showScanner' });
+        }}
         onTimeout={() => dispatch({ type: 'healthFailed', message: 'Connection timed out' })}
       />
     );
@@ -213,7 +203,13 @@ export default function App({
         </Text>
         <StatusMessage tone={statusTone} text={state.message} />
         <View style={styles.buttonStack}>
-          <PrimaryButton label="Open scanner" onPress={() => dispatch({ type: 'showScanner' })} />
+          <PrimaryButton
+            label="Open scanner"
+            onPress={() => {
+              setScannerFixture(undefined);
+              dispatch({ type: 'showScanner' });
+            }}
+          />
           {state.connectivity === 'offline' ? (
             <SecondaryButton label="Retry connection" onPress={() => void checkHealth()} />
           ) : null}
@@ -236,15 +232,4 @@ const styles = StyleSheet.create({
   title: { color: '#1D241F', fontSize: 40, fontWeight: '700', letterSpacing: -1.2 },
   body: { color: '#575750', fontSize: 18, lineHeight: 26, maxWidth: 330 },
   buttonStack: { gap: 12, marginTop: 12 },
-  scannerScreen: { backgroundColor: '#111713', flex: 1 },
-  scannerHeader: { gap: 12, padding: 24 },
-  scannerTitle: { color: '#FFFFFF', fontSize: 24, fontWeight: '600' },
-  scannerHint: { color: '#A9B1AC', fontSize: 15 },
-  scanGuide: { alignSelf: 'center', flex: 1, marginBottom: 52, width: '78%' },
-  scannerActions: { paddingHorizontal: 24, paddingBottom: 16 },
-  corner: { borderColor: '#EDE8DC', height: 42, position: 'absolute', width: 42 },
-  topLeft: { borderLeftWidth: 3, borderTopWidth: 3, left: 0, top: 0 },
-  topRight: { borderRightWidth: 3, borderTopWidth: 3, right: 0, top: 0 },
-  bottomLeft: { borderBottomWidth: 3, borderLeftWidth: 3, bottom: 0, left: 0 },
-  bottomRight: { borderBottomWidth: 3, borderRightWidth: 3, bottom: 0, right: 0 },
 });

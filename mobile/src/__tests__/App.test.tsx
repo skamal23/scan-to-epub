@@ -1,6 +1,24 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Keyboard } from 'react-native';
 
+jest.mock('expo-camera', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    CameraView: (props: object) => React.createElement(View, { ...props, testID: 'camera-view' }),
+    useCameraPermissions: () => [
+      { granted: true, status: 'granted', canAskAgain: true },
+      jest.fn(),
+      jest.fn(),
+    ],
+  };
+});
+
+jest.mock('expo-haptics', () => ({
+  NotificationFeedbackType: { Success: 'success' },
+  notificationAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 import App from '../../App';
 import type { BackendClient } from '../api/health';
 import type {
@@ -42,8 +60,10 @@ const prideCandidate: MetadataCandidate = {
   sources: [],
 };
 
-const metadataClient = (result: MetadataSearchResult): MetadataClient => ({
-  search: jest.fn().mockResolvedValue(result),
+const metadataClient = (
+  result: Omit<MetadataSearchResult, 'observedIsbn'> & { observedIsbn?: string | null },
+): MetadataClient => ({
+  search: jest.fn().mockResolvedValue({ observedIsbn: null, ...result }),
 });
 
 describe('<App />', () => {
@@ -56,8 +76,8 @@ describe('<App />', () => {
     await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
 
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
-    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
-    expect(view.getByLabelText('Book scan guide')).toBeTruthy();
+    expect(view.getByText('Scan the ISBN barcode')).toBeTruthy();
+    expect(view.getByLabelText('ISBN scan guide')).toBeTruthy();
   });
 
   test('shows an unavailable state and retries successfully', async () => {
@@ -258,7 +278,7 @@ describe('<App />', () => {
     expect(requestSignal?.aborted).toBe(true);
     expect(view.getByLabelText('Book title')).toBeTruthy();
 
-    resolveSearch({ candidates: [prideCandidate], providerFailures: [] });
+    resolveSearch({ observedIsbn: null, candidates: [prideCandidate], providerFailures: [] });
     await Promise.resolve();
     expect(view.queryByText('Is this the right book?')).toBeNull();
     expect(view.getByLabelText('Book title')).toBeTruthy();
@@ -281,5 +301,26 @@ describe('<App />', () => {
 
     fireEvent(view.getByTestId('cover-pride'), 'error');
     expect(view.getByText('No cover')).toBeTruthy();
+  });
+
+  test('routes a repeated fixture ISBN through the production metadata flow', async () => {
+    const metadata = metadataClient({
+      observedIsbn: '9780141439518',
+      candidates: [prideCandidate],
+      providerFailures: [],
+    });
+    const view = render(
+      <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Repeated ISBN' }));
+
+    expect(view.getByText('ISBN captured.')).toBeTruthy();
+    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    expect(metadata.search).toHaveBeenCalledWith(
+      { isbn: '9780141439518' },
+      expect.anything(),
+    );
   });
 });

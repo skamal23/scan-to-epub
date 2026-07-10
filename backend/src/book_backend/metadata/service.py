@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import re
 import time
 from collections import defaultdict
@@ -15,6 +16,8 @@ from .models import (
     WorkSummary,
 )
 from .providers import MetadataProvider
+
+METADATA_LOGGER = logging.getLogger("book_backend.metadata")
 
 
 class MetadataSearchService:
@@ -42,6 +45,7 @@ class MetadataSearchService:
         for provider, outcome in zip(self.providers, outcomes, strict=True):
             if isinstance(outcome, BaseException):
                 failures.append(provider.name)
+                METADATA_LOGGER.warning("metadata provider failed: %s", provider.name)
             else:
                 records.extend(outcome)
 
@@ -55,7 +59,11 @@ class MetadataSearchService:
             reverse=True,
         )
         candidates = [self._candidate(query, score, group) for score, group in ranked[:3]]
-        result = MetadataSearchResult(candidates=candidates, provider_failures=failures)
+        result = MetadataSearchResult(
+            observed_isbn=query.isbn,
+            candidates=candidates,
+            provider_failures=failures,
+        )
         if not failures and self.cache_ttl_seconds > 0:
             self._cache[query] = (now + self.cache_ttl_seconds, result.model_copy(deep=True))
         return result

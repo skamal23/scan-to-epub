@@ -94,5 +94,6 @@ class MetadataCandidate(APIModel):
 
 
 class MetadataSearchResult(APIModel):
+    observed_isbn: str | None
     candidates: list[MetadataCandidate]
     provider_failures: list[str]

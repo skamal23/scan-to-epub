@@ -32,6 +32,7 @@ export type MetadataCandidate = {
 };
 
 export type MetadataSearchResult = {
+  observedIsbn: string | null;
   candidates: MetadataCandidate[];
   providerFailures: string[];
 };
@@ -116,11 +117,20 @@ export function createMetadataClient(options: {
 }
 
 export function decodeMetadataSearchResult(value: unknown): MetadataSearchResult {
-  if (!isRecord(value) || !Array.isArray(value.candidates) || !isStringArray(value.providerFailures)) {
+  if (
+    !isRecord(value) ||
+    !isNullableString(value.observedIsbn) ||
+    !Array.isArray(value.candidates) ||
+    !isStringArray(value.providerFailures)
+  ) {
     throw new ContractError('Metadata response did not match the contract');
   }
   const candidates = value.candidates.map(decodeCandidate);
-  return { candidates, providerFailures: value.providerFailures };
+  return {
+    observedIsbn: value.observedIsbn,
+    candidates,
+    providerFailures: value.providerFailures,
+  };
 }
 
 function decodeCandidate(value: unknown): MetadataCandidate {
