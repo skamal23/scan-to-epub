@@ -2,21 +2,21 @@
 
 > **Implementation rule:** Complete and verify one phase before beginning the next. Each phase delivers a usable vertical slice across the backend and iOS app. Exact files, APIs, libraries, and code-level tasks will be decided when that phase begins.
 
-**Goal:** Build a native iPhone demo that scans a physical book, identifies the work, finds or creates a verified legal EPUB, and lets the user open it in Apple Books or save it to Files.
+**Goal:** Build an iPhone demo that scans a physical book, identifies the work, finds or creates a verified legal EPUB, and lets the user open it in Apple Books or save it to Files.
 
-**Architecture:** A native SwiftUI app performs camera capture, barcode recognition, OCR, local image comparison, confirmation, and export. A small stateless backend normalizes book metadata, applies source and rights rules, acquires or generates EPUBs, validates them, and returns provenance. There are no user accounts and cover photos remain on the phone in the normal path.
+**Architecture:** An Expo/React Native iPhone app performs camera capture, barcode recognition, confirmation, download, and export. A small stateless backend performs ephemeral front-cover OCR and comparison, normalizes book metadata, applies source and rights rules, acquires or generates EPUBs, validates them, and returns provenance. There are no user accounts or persistent scan histories; front-cover crops are deleted after each recognition request.
 
-**Expected stack:** Native SwiftUI with Apple Vision/VisionKit on iOS; a small Python HTTP service by default because its document-processing ecosystem suits EPUB and PDF work; EPUBCheck on the backend; a reviewed catalog stored in a simple local database or structured data set. Exact package choices remain phase-level decisions.
+**Expected stack:** Expo with React Native and TypeScript, Expo Camera, Expo FileSystem, and Expo Sharing; Expo Go during the initial functional phases; an Expo development build when native configuration, native modules, stable E2E binaries, or release behavior require it; a small Python HTTP service by default because its image/document ecosystem suits recognition, EPUB, and PDF work; EPUBCheck on the backend; and a reviewed catalog stored in a simple local database or structured data set. Exact package choices remain phase-level decisions.
 
 ## Global constraints
 
-- Build a native iPhone app, not a browser app and not an Expo Go prototype.
+- Build a real iPhone app, not a browser app. Expo Go is the initial development runtime, not the distributed product.
 - Start with a U.S.-only, English-language demo.
 - Require no login, account, subscription, or cloud library.
 - Export to Apple Books and Files; do not build a native reader in this implementation sequence.
 - Do not scan or OCR the pages of a user's physical book.
 - Use hybrid scanning: confidence-gated automatic capture plus a manual shutter.
-- Keep cover photos on-device in the normal recognition flow.
+- Validate barcode observations on-device. Upload only a bounded front-cover crop when cover recognition is requested; exclude it from logs and delete it on success, failure, cancellation, or timeout.
 - Prefer an existing authorized EPUB over generating one.
 - Use only allowlisted public-domain or explicitly open-licensed content sources.
 - Never use shadow libraries, random file searches, loans, previews, DRM, or physical-book ownership as authorization.
@@ -25,7 +25,8 @@
 - Require every delivered EPUB to pass EPUBCheck without conformance errors.
 - Keep the UI simple and coherent through the functional phases: system typography, neutral colors, one accent, clear cards/sheets, and restrained transitions.
 - Defer the cinematic visual system, refined motion, and detailed styling until the app is functionally complete.
-- Every phase includes automated tests, live Simulator inspection through Computer Use, and physical-device testing whenever hardware behavior is involved.
+- Every phase includes automated tests and an extensive live Simulator walkthrough through Computer Use.
+- Camera hardware, haptics, performance, and Apple Books acceptance are consolidated into a user-run physical-iPhone pass after the functional and visual phases; they do not block earlier phase completion.
 
 ## How each phase will be executed
 
@@ -35,41 +36,45 @@ For every phase, we will follow the same completion loop:
 2. Decide the exact code structure and interfaces only for the current phase.
 3. Add deterministic test fixtures before relying on live third-party services.
 4. Build the backend and iOS work together so the phase ends in a visible user outcome.
-5. Run backend tests, Swift tests, contract tests, and UI tests.
-6. Build and launch the app in iOS Simulator.
-7. Use Computer Use to inspect and interact with the real Simulator UI rather than accepting screenshots from code alone.
-8. Run the phase's physical-iPhone test when the feature depends on the camera, Apple Books, actual touch interaction, or device performance.
+5. Run backend tests, TypeScript tests, component tests, contract tests, and repeatable mobile E2E tests appropriate to the phase.
+6. Launch the Expo app in iOS Simulator, using Expo Go until the project moves to its development build.
+7. Use Computer Use to inspect and interact with the real Simulator UI: complete the primary path, alternate paths, cancellation, retry, offline/slow states, long content, and the phase's deterministic failure scenarios.
+8. Capture evidence for important screens and record any hardware behavior that remains intentionally unverified.
 9. Compare the result with the phase exit gate.
-10. Fix failures, record evidence, commit the completed phase, and only then proceed.
+10. Fix failures, rerun the automated and Computer Use checks, commit the completed phase, and only then proceed.
 
-The browser is not a substitute for the iOS app. Backend endpoints may be inspected with command-line tools, but the user-facing experience is validated in Simulator and on an iPhone.
+The browser is not a substitute for the iOS app. Backend endpoints may be inspected with command-line tools, but the user-facing experience is validated in the actual Expo iOS app inside Simulator. Physical-iPhone validation is a separate final gate.
 
 ## Development and testing setup
 
-Full Xcode is not currently installed on this Mac; only Apple's command-line developer tools and Swift are present. Before Phase 0 can finish, install the latest stable Xcode from the Mac App Store and open it once so it can install the selected iOS platform support.
+Full Xcode is not currently installed on this Mac; only Apple's command-line developer tools and Swift are present. Expo does not remove the need for Xcode when I need to run and control iOS Simulator. Before Phase 0 can finish, install the latest stable Xcode from the Mac App Store and open it once so it can install an iOS Simulator runtime.
+
+After Xcode is available, Expo CLI can install and launch Expo Go in Simulator with the project. The phone QR-code workflow remains available independently: the user installs Expo Go on the iPhone and scans the development QR code while the app remains compatible with Expo Go.
 
 A free Apple developer account is sufficient to test the app directly on your own iPhone through Xcode. A paid Apple Developer Program membership is only needed when we want TestFlight or App Store distribution. Apple currently documents both the free on-device testing path and the paid TestFlight/distribution path on its [Developer Program page](https://developer.apple.com/programs/).
 
-For physical-device development:
+For the later physical-device pass:
 
 1. Install and open Xcode.
 2. Sign in to Xcode with your Apple Account.
 3. Connect the iPhone to the Mac and trust the Mac when prompted.
-4. Select the phone as the Xcode run destination and use automatic signing.
+4. Use Expo Go while the project remains compatible with it, or select the phone as the Xcode run destination and use automatic signing after the project moves to a development build.
 5. Enable Developer Mode on the iPhone when Xcode prompts for it. Apple documents this under [Enabling Developer Mode](https://developer.apple.com/documentation/Xcode/enabling-developer-mode-on-a-device).
 6. Keep Apple Books installed for the export phases.
 
-The Simulator will cover most UI, networking, navigation, error, Files, and accessibility work. It does not emulate the camera, and Apple recommends hardware testing for hardware-specific behavior and real interaction. See [Simulator versus hardware devices](https://developer.apple.com/documentation/xcode/testing-in-simulator-versus-testing-on-hardware-devices). Therefore, camera phases include a deterministic image-fixture path for automation and a separate real-iPhone acceptance test.
+The Simulator covers UI, networking, navigation, state transitions, errors, file handling, sharing, accessibility, and nearly the entire backend pipeline. It does not emulate the camera. Therefore, the app includes a development-only scenario launcher that can inject a barcode observation, upload a fixture cover image, and select any later pipeline result while using the same production state and UI code after the camera boundary. [Expo's iOS Simulator guide](https://docs.expo.dev/workflow/ios-simulator/) documents the camera limitation.
+
+Critical golden paths will also receive Maestro E2E coverage against an installable simulator build. Expo documents local and hosted Maestro testing for iOS Simulator builds. [Expo Maestro E2E guide](https://docs.expo.dev/eas/workflows/examples/e2e-tests/)
 
 If we later want TestFlight, the paid program currently costs $99 annually and provides TestFlight distribution. We can postpone that decision until the release phase; direct Xcode installation on your own device is enough during development.
 
 ---
 
-## Phase 0 — Foundation and a running native shell
+## Phase 0 — Foundation and a running Expo shell
 
 ### Purpose
 
-Establish a real native iOS project, a real backend service, repeatable test commands, and the device-development path before implementing book features.
+Establish a real Expo iOS project, a real backend service, repeatable test commands, Simulator control, and the later device-development path before implementing book features.
 
 ### Backend work
 
@@ -78,46 +83,48 @@ Establish a real native iOS project, a real backend service, repeatable test com
 - Add a fixture mode so later tests can use deterministic local responses instead of depending on Google Books or Open Library.
 - Establish environment handling for third-party API keys without committing secrets.
 - Prepare local development and a reproducible HTTPS development deployment that a physical iPhone can reach.
-- Add basic request logging that excludes cover photos, personal data, and persistent book-query history.
+- Add basic request logging that excludes request bodies, cover photos, personal data, and persistent book-query history.
 
 ### iOS work
 
-- Create the native SwiftUI app and its test targets.
+- Create the Expo/React Native TypeScript app and its test targets, with Expo Go as the initial runtime.
 - Establish the core navigation/state structure for permission, scanner, processing, confirmation, result, and error screens.
 - Implement a simple launch screen with a backend connectivity status and a button that enters a placeholder scanner screen.
 - Add environment selection for fixture, local development, and hosted development backends.
 - Establish simple reusable visual primitives: primary button, secondary button, book card, status message, loading indicator, and sheet container.
+- Add a development-only scenario launcher with placeholder success, loading, offline, and error states; keep it structurally separate so release builds cannot expose it.
 - Keep styling intentionally modest: system font, neutral background, one accent color, no elaborate motion.
 
 ### Automated testing
 
 - Backend health and configuration tests.
-- iOS app-launch and navigation-state tests.
+- TypeScript app-state, app-launch, and navigation tests.
+- React Native component tests for the initial screens and reusable primitives.
 - A contract test proving the app can decode the backend health response.
 - A failure test for backend unavailable/timeout behavior.
-- Clean backend test command and clean iOS build/test command.
+- Clean backend, frontend, and simulator-build test commands.
 
 ### Live validation
 
 - Build and launch the app in iOS Simulator.
 - Use Computer Use to tap through the launch and placeholder scanner screens and inspect loading, success, and offline states.
-- Run the app on your physical iPhone through Xcode and confirm it reaches the hosted development backend.
+- Use Computer Use to open the scenario launcher and traverse success, loading, offline, timeout, and retry states.
 
 ### What the app looks like at the end
 
-A basic native app launches reliably, shows a minimal connection status, and opens a bare scanner-shaped screen. It does not identify books yet, but the iOS app, backend, tests, Simulator, signing, and physical phone are connected.
+A basic Expo app launches reliably in iOS Simulator, shows a minimal connection status, and opens a bare scanner-shaped screen. It does not identify books yet, but the app, backend, automated tests, scenario harness, Expo runtime, and Computer Use loop are connected.
 
 ### Exit gate
 
 - Backend tests pass.
-- iOS unit/UI tests pass.
+- Frontend unit/component tests pass.
 - The app builds from a clean checkout.
 - Computer Use confirms the Simulator flow behaves correctly.
-- Your iPhone can launch the development build and reach the backend.
+- Every Phase 0 scenario can be reached and inspected through Computer Use in Simulator.
 
 ### User involvement
 
-Install Xcode, sign in with an Apple Account, pair the iPhone, enable Developer Mode, and perform the first physical launch. This is the only significant setup blocker currently known.
+Install and open full Xcode with an iOS Simulator runtime. Apple-account sign-in, phone pairing, and Developer Mode can wait until the consolidated physical-device pass.
 
 ---
 
@@ -151,13 +158,14 @@ Prove metadata lookup, normalized candidates, app/backend contracts, and the con
 - ISBN formatting and checksum tests.
 - Candidate-ranking tests for exact, ambiguous, and conflicting provider data.
 - Contract tests using recorded provider fixtures.
-- Swift state tests for loading, results, ambiguity, no result, retry, and cancellation.
+- TypeScript state tests for loading, results, ambiguity, no result, retry, and cancellation.
 - UI tests for manual entry and candidate selection.
 
 ### Live validation
 
 - Use Computer Use in Simulator to search by a known ISBN, by title/author, and with an intentionally ambiguous title.
 - Inspect long titles, missing covers, provider errors, and offline behavior.
+- Traverse every deterministic candidate outcome through the scenario launcher and verify back, cancel, retry, and “None of these” behavior.
 - Run at least one live lookup against each metadata provider without relying on that live response for automated test success.
 
 ### What the app looks like at the end
@@ -192,29 +200,29 @@ Turn the app into a real book scanner using the strongest recognition path: a va
 
 ### iOS work
 
-- Replace the scanner shell with the actual camera experience.
+- Replace the scanner shell with the Expo Camera experience.
 - Request camera permission with clear purpose copy and provide denied/restricted recovery.
 - Detect EAN-13 book barcodes in the scan region.
 - Validate ISBN prefix and checksum locally.
 - Require a stable repeated observation before automatic capture.
 - Keep the manual shutter available as the hybrid fallback.
 - Freeze the camera briefly, provide restrained visual/haptic capture feedback, then transition to processing and confirmation.
-- Provide a debug/test input that feeds recorded barcode images into the same recognition logic without pretending Simulator has a camera.
+- Extend the development scenario launcher so it injects valid, invalid, unstable, and repeated ISBN observations at the camera boundary without pretending Simulator has a camera.
 
 ### Automated testing
 
 - Valid and invalid EAN-13/ISBN checksum cases.
 - Repeated-observation stability and duplicate-capture suppression.
 - Permission allowed, denied, and restricted states.
-- Recorded barcode-image recognition tests.
+- ISBN-observation and scanner-state tests using recorded payload sequences.
 - UI tests that inject a recognized ISBN and complete confirmation.
 - Backend contract and provider-fallback tests for scanned ISBNs.
 
 ### Live validation
 
 - Use Computer Use to verify the permission, scanner, injected-barcode, processing, and confirmation flows in Simulator.
-- On your iPhone, scan several real back-cover barcodes at different distances and under different lighting.
-- Confirm the app does not capture repeatedly, accepts the manual shutter, and recovers after a failed scan.
+- Exercise stable success, invalid barcode, repeated capture suppression, cancellation, retry, and permission-recovery scenarios through deterministic inputs.
+- Inspect the scanner at small and large simulated phone sizes, over light and dark fixture backgrounds.
 
 ### What the app looks like at the end
 
@@ -222,14 +230,14 @@ The app opens into a functional, minimal camera scanner. Holding a valid ISBN ba
 
 ### Exit gate
 
-- Every normal-light barcode in the curated Phase 2 set resolves to the correct physical edition.
+- Every valid injected barcode in the curated Phase 2 fixture set resolves to the correct physical edition.
 - Invalid/non-book barcodes do not produce book matches.
 - Automatic capture is stable and manual capture remains available.
-- Physical-device acceptance passes; Simulator-only evidence is not sufficient.
+- Computer Use confirms the complete post-camera barcode flow and every scanner UI state in Simulator.
 
 ### User involvement
 
-Hold the books and perform the real camera tests on the iPhone. I can automate and inspect the rest, but I cannot independently point your physical phone at the books.
+No required involvement during this phase. Real barcode-camera accuracy is intentionally deferred to the consolidated physical-iPhone pass after the app is functionally complete.
 
 ---
 
@@ -241,23 +249,23 @@ Support the more magical but less deterministic path: identify a book from its f
 
 ### Backend work
 
-- Accept normalized OCR terms rather than a cover photo.
-- Generate multiple conservative metadata queries from likely title, author, subtitle, series, and publisher terms.
-- Return a small candidate set with enough metadata and permitted cover references for local comparison.
-- Extend candidate ranking with textual evidence while leaving cover-image similarity on-device.
-- Add fixtures for ornate covers, missing authors, subtitles, series names, duplicate editions, and no useful OCR.
+- Accept a tightly size-limited front-cover crop at a dedicated recognition endpoint.
+- Correct perspective where confidence permits, run deterministic OCR, and extract likely title, author, subtitle, series, and publisher terms.
+- Generate multiple conservative metadata queries and retrieve a small candidate set with permitted cover references.
+- Compare the temporary crop with candidate covers and combine textual, author, language, publication, and image evidence.
+- Delete the uploaded image and derived image features on success, failure, cancellation, or timeout; never include them in logs or backups.
+- Add fixtures for ornate covers, missing authors, subtitles, series names, duplicate editions, no useful OCR, oversized images, corrupt images, and recognition timeouts.
 
 ### iOS work
 
-- Detect the likely book/document rectangle in the scan region.
-- Gate automatic capture on stable geometry and useful recognized text.
-- Capture a high-resolution frame and correct perspective.
-- Run accurate on-device OCR and extract likely title/author terms.
-- Download the small candidate cover set and compare it locally with the captured cover.
-- Combine text and cover evidence into high, medium, and low confidence outcomes.
+- Use the scanner guide and manual shutter for front covers while barcode capture remains automatic.
+- Capture a high-resolution frame, crop it to the guide, correct orientation, and compress it within the backend's request limit.
+- Explain concisely on first use that the cover crop is sent temporarily for identification and not retained.
+- Upload the crop with cancellation, timeout, offline, and retry behavior.
+- Present the backend's high, medium, and low confidence outcomes without implying certainty the evidence does not support.
 - Auto-advance only when one candidate clearly wins; otherwise show up to three choices.
 - Offer clear recovery: rescan, scan the back barcode, or enter the title manually.
-- Delete the captured cover when the session no longer needs it.
+- Delete the local temporary capture when the request or session no longer needs it.
 
 ### Automated testing
 
@@ -265,14 +273,15 @@ Support the more magical but less deterministic path: identify a book from its f
 - OCR normalization and title/author extraction tests.
 - Cover-feature comparison tests with known positive and negative editions.
 - Confidence and refusal tests so visual similarity alone cannot force a wrong match.
-- Privacy tests proving the normal request contains text/ISBN metadata rather than the cover image.
+- Upload size/type tests and server-side deletion tests for success, failure, cancellation, and timeout.
+- Privacy tests proving barcode requests contain no image and cover images appear only in the dedicated ephemeral recognition request.
 - UI tests for high-confidence, ambiguous, and failed-cover paths.
 
 ### Live validation
 
-- Use fixture images in Simulator and Computer Use to inspect the entire confirmation/recovery experience.
-- On your iPhone, scan the front of each curated physical book under several lighting and angle conditions.
-- Compare the top candidate and confirmation list with the recorded expected work.
+- Use fixture images in Simulator and Computer Use to send straight, angled, dim, glossy, partial, ornate, and negative covers through the real recognition endpoint.
+- Inspect upload progress, cancellation, timeout, ambiguity, no match, retry, scan-the-back recovery, and manual-search recovery.
+- Confirm that local UI state and backend logs contain no retained cover after every completed or interrupted scenario.
 
 ### What the app looks like at the end
 
@@ -280,14 +289,14 @@ The same simple camera screen recognizes either the front cover or back barcode.
 
 ### Exit gate
 
-- The correct work is first or within the displayed choices for at least 95% of normal-light captures in the curated set.
+- The correct work is first or within the displayed choices for at least 95% of the curated fixture-cover set.
 - There are no confidently auto-selected wrong works in the release corpus.
-- Captured cover images remain local and are cleaned up.
-- Real-device cover scanning passes.
+- Local and backend cover images are cleaned up according to the ephemeral processing contract.
+- Computer Use confirms every recognition, confirmation, and recovery state in Simulator.
 
 ### User involvement
 
-Perform the physical cover corpus on the iPhone and report any covers that consistently fail. Those become permanent regression fixtures where licensing permits storing the test image.
+No required involvement during this phase. Real front-cover framing and camera-image quality are deferred to the consolidated physical-iPhone pass. Failures found there become regression fixtures when storing the image is permitted.
 
 ---
 
@@ -329,7 +338,7 @@ Connect confirmed book identity to one verified legal digital edition and show a
 
 - Complete recognition in Simulator using fixtures and inspect the ready and unavailable states through Computer Use.
 - Perform controlled low-volume live acquisition from Standard Ebooks.
-- On the iPhone, scan one supported public-domain work and one modern unsupported book and confirm that the outcomes differ correctly.
+- Use deterministic supported and unsupported observations to confirm that their rights outcomes and recovery choices differ correctly.
 
 ### What the app looks like at the end
 
@@ -344,7 +353,7 @@ A user can scan and confirm a book, then see either a verified legal EPUB result
 
 ### User involvement
 
-Review the one-sentence edition-difference explanation and rights-details presentation. Perform one positive and one negative scan on the iPhone.
+Optional review of the one-sentence edition-difference explanation and rights-details presentation. Physical scans remain deferred.
 
 ---
 
@@ -367,9 +376,9 @@ Complete the first genuine user journey from physical book to a usable EPUB outs
 - Download the validated EPUB to temporary local storage with progress and cancellation.
 - Confirm the file type and expected hash before export.
 - Add the real “Open in Books” action using the iOS share workflow and tell the user to choose Books.
-- Add “Save to Files” using the system document picker.
+- Add “Save to Files” using the iOS share workflow with a concise instruction to choose Save to Files.
 - Use a clean filename based on title and author.
-- Return to a stable ready screen if the user cancels either system sheet.
+- Return to a stable ready screen if the user cancels either share workflow.
 - Clean up temporary files without deleting a file still being shared.
 - Handle Apple Books not being available by keeping Files/other compatible apps usable.
 
@@ -383,9 +392,8 @@ Complete the first genuine user journey from physical book to a usable EPUB outs
 ### Live validation
 
 - Use Computer Use in Simulator to validate download progress, cancellation, Files export, and return-to-ready behavior.
-- On your physical iPhone, complete the entire path from scan to opening the EPUB in Apple Books.
-- Close and reopen the imported book in Apple Books and confirm navigation/metadata are usable.
-- Save the same file to Files and reopen it from Files.
+- Open the real iOS share sheet from deterministic barcode and cover paths, inspect compatible destinations, cancel it, reopen it, and verify stable return behavior.
+- Save the same file to Simulator Files when available and reopen it through the simulated Files workflow.
 
 ### What the app looks like at the end
 
@@ -393,14 +401,14 @@ This is the first complete functional demo: scan a supported book, confirm it, v
 
 ### Exit gate
 
-- The full barcode and front-cover paths can reach Apple Books on a real iPhone.
+- The full deterministic barcode and front-cover paths reach the real iOS share sheet in Simulator.
 - Save to Files produces a reusable `.epub` file.
 - Cancellation and retry do not require rescanning.
 - No invalid or unverified file can reach a share sheet.
 
 ### User involvement
 
-Perform the Apple Books import and Files export on your iPhone. This cannot be certified by Simulator because the Simulator lacks the real camera and is not a substitute for the device's Books integration.
+No required involvement during this phase. The final Apple Books import and reopen check remains explicitly pending until the consolidated physical-iPhone pass.
 
 ---
 
@@ -443,7 +451,7 @@ Move beyond the first curated Standard Ebooks slice while keeping one consistent
 
 - Run low-volume real checks against each source outside the automated suite.
 - Use Computer Use in Simulator to observe fallback and source-details states.
-- On the iPhone, scan representative books resolving through Standard Ebooks, Gutenberg, Google public domain, and OAPEN/DOAB where physical examples are available.
+- Inject representative books resolving through Standard Ebooks, Gutenberg, Google public domain, and OAPEN/DOAB and complete each path through the Simulator UI.
 
 ### What the app looks like at the end
 
@@ -457,7 +465,7 @@ The same simple scan flow now works across several trustworthy collections. The 
 
 ### User involvement
 
-Help select or obtain representative physical books for the expanded source catalog and perform any source path that cannot be reproduced with an existing book on hand.
+Optional help selecting representative physical books for the later final demo. All Phase 6 functional acceptance uses deterministic observations and live source smoke tests.
 
 ---
 
@@ -496,7 +504,7 @@ Support legal works that lack an existing EPUB but provide clean, rights-cleared
 ### Live validation
 
 - Use Computer Use to run a structured-text conversion through the Simulator UI and inspect its result/provenance.
-- On the iPhone, open at least two generated EPUBs in Apple Books and inspect chapter navigation, font resizing, links, footnotes, and metadata.
+- Exercise at least two generated EPUBs through the Simulator download/share flow and inspect their package, navigation, links, footnotes, metadata, and rendered chapter fixtures.
 
 ### What the app looks like at the end
 
@@ -506,12 +514,12 @@ If no EPUB exists but a legal structured source does, the user sees a slightly l
 
 - Generated fixtures preserve all intended text in order.
 - Every generated EPUB passes EPUBCheck.
-- Generated books open and navigate correctly in Apple Books on a real iPhone.
+- Generated books pass deterministic navigation, link, metadata, and share-flow checks; physical Apple Books reading remains pending until Phase 11.
 - No AI-generated content enters the book.
 
 ### User involvement
 
-Open and spot-check the generated books in Apple Books, especially chapter navigation and footnotes, because reading feel cannot be proven by unit tests alone.
+No required involvement during this phase. Physical Apple Books reading quality is part of the consolidated Phase 11 device checklist.
 
 ---
 
@@ -555,8 +563,8 @@ Convert rights-cleared, text-based PDFs with simple trustworthy structure while 
 ### Live validation
 
 - Use Computer Use to exercise a successful PDF and multiple refusal reasons in Simulator.
-- On the iPhone, import a PDF-derived EPUB into Apple Books and inspect several chapters against the original PDF side by side.
-- Confirm a complex or scanned PDF fails without generating a file.
+- Compare several rendered chapters of a successful fixture with its original PDF and inspect refusal behavior for complex and scanned PDFs.
+- Confirm through the UI and backend evidence that rejected fixtures never produce a downloadable file.
 
 ### What the app looks like at the end
 
@@ -566,12 +574,12 @@ A simple legal PDF can become a clean EPUB through the same scan flow. Complex o
 
 - Every successful PDF fixture accounts for each body-text block exactly once and in order.
 - Every complex/image-only fixture fails closed.
-- PDF-derived EPUBs pass EPUBCheck and open correctly in Apple Books.
+- PDF-derived EPUBs pass EPUBCheck, deterministic content/render checks, and the Simulator share flow; physical Apple Books reading remains pending until Phase 11.
 - The UI never implies that every PDF can be converted.
 
 ### User involvement
 
-Perform the side-by-side reading check on a physical iPhone and confirm that rejected complex PDFs fail in a way that feels understandable rather than broken.
+Optional review of the refusal wording. The physical side-by-side reading check is consolidated into Phase 11.
 
 ---
 
@@ -594,7 +602,8 @@ Turn all implemented capabilities into a reliable functional beta before major v
 ### iOS work
 
 - Complete every error/recovery path from PLAN.md: permissions, unreadable cover, invalid ISBN, ambiguity, offline, timeout, source outage, invalid file, conversion refusal, Books unavailable, and cancelled export.
-- Preserve session progress through transient network failures without retaining cover photos longer than necessary.
+- Preserve session progress through transient network failures while deleting local and backend cover images as soon as recognition no longer needs them.
+- Move from stock Expo Go to an Expo development build here if no earlier native requirement triggered the move, so the complete app has its own stable installable runtime before polish.
 - Add VoiceOver labels/announcements, Dynamic Type, contrast, Reduce Motion, and non-color status cues.
 - Confirm manual search and manual shutter remain available.
 - Remove development-only controls from the normal UI while retaining test hooks inside test builds.
@@ -607,14 +616,15 @@ Turn all implemented capabilities into a reliable functional beta before major v
 - Privacy tests for requests, logs, storage, and temporary files.
 - Full accessibility audit tests and UI automation at large text sizes.
 - All required end-to-end scenarios from PLAN.md using deterministic fixtures.
+- Maestro golden flows against the installable iOS Simulator development build.
 - Performance measurements for capture-to-candidate, confirmation-to-ready, downloads, generation, and conversion.
 
 ### Live validation
 
 - Use Computer Use to traverse every screen and failure state in Simulator, including large text and Reduce Motion.
 - Test offline/online transitions and slow responses.
-- Run the complete golden scenario suite on the physical iPhone: barcode, front cover, ambiguity, unsupported modern book, source outage, HTML generation, PDF conversion, PDF refusal, Apple Books, and Files.
-- Check device heat, responsiveness, camera framing, and touch-target comfort.
+- Run the complete deterministic golden scenario suite in Simulator: barcode, front cover, ambiguity, unsupported modern book, source outage, HTML generation, PDF conversion, PDF refusal, sharing, and Files.
+- Repeat important paths at multiple simulated phone sizes and capture the baseline screenshots used by the polish phase.
 
 ### What the app looks like at the end
 
@@ -626,11 +636,11 @@ The app is functionally complete. It is intentionally simple rather than visuall
 - All PLAN.md golden scenarios pass.
 - No known rights/security/privacy failure can deliver a file.
 - Accessibility works across the full flow.
-- The same build passes Simulator and real-device acceptance.
+- The Expo development build passes automated, Maestro, and Computer Use acceptance in Simulator; hardware acceptance is explicitly pending.
 
 ### User involvement
 
-Run the full physical-device acceptance checklist and identify any confusing copy or interaction before visual polish locks in the presentation.
+Optional review of the functional flow and copy from Simulator screenshots. No physical-device work is required yet.
 
 ---
 
@@ -643,7 +653,7 @@ Transform the verified functional beta into the cinematic, modern demo without d
 ### Backend work
 
 - Expose accurate progress states and timings needed by the polished transitions.
-- Optimize slow source-resolution or conversion steps revealed by real-device profiling.
+- Optimize slow source-resolution or conversion steps revealed by measured development-build profiling.
 - Ensure response payloads contain the authorized digital cover, edition distinction, source, license, and status text needed by the final UI.
 - Keep contracts backward-compatible while visual work proceeds.
 
@@ -667,8 +677,8 @@ Transform the verified functional beta into the cinematic, modern demo without d
 
 - Use Computer Use to inspect every Simulator screen at multiple device sizes and capture comparison screenshots.
 - Slow animations in Simulator to inspect continuity and accidental jumps.
-- Test real-device motion, haptics, camera legibility, and one-handed touch comfort.
-- Have you approve the final visual direction and any iterations.
+- Exercise light/dark backgrounds, large text, Reduce Motion, long titles, sheets, keyboard states, and every major transition.
+- Have you approve the final visual direction from captured Simulator screens and any iterations.
 
 ### What the app looks like at the end
 
@@ -679,12 +689,12 @@ The product now feels intentional and demo-ready: a quiet cinematic scanner, cle
 - Functional behavior and automated coverage remain intact.
 - Visual regression baselines are approved.
 - Reduce Motion and accessibility alternatives are equally usable.
-- Real-device animation/haptic review passes.
+- All interaction and visual states pass Simulator review; real-device motion and haptics remain pending for Phase 11.
 - You approve the presentation for a public demo.
 
 ### User involvement
 
-Review and approve visual iterations on the physical iPhone. Simulator screenshots help, but the camera overlay, motion, haptics, and touch feel require the device.
+Review and approve the Simulator screenshots and interaction recordings. Physical camera legibility, motion, haptics, and one-handed feel are consolidated into Phase 11.
 
 ---
 
@@ -706,8 +716,8 @@ Freeze a reproducible build, verify the real deployment, and make the app easy f
 
 - Finalize app identity, icons, camera purpose string, privacy/legal screen, open-source notices, and build configuration.
 - Remove debug fixture access from the release UI.
-- Verify automatic signing and archive the exact release build.
-- Install directly through Xcode for personal demo use, or configure App Store Connect/TestFlight if you choose paid membership.
+- Produce the standalone signed iOS release candidate from the Expo project and archive the exact build and configuration.
+- Install directly as a local development/release build for personal demo use, or configure EAS Build/App Store Connect/TestFlight if you choose paid membership.
 - Prepare a short in-app or external demo script using the curated positive and negative books.
 
 ### Automated testing
@@ -717,11 +727,12 @@ Freeze a reproducible build, verify the real deployment, and make the app easy f
 - Fresh-install and upgrade-state tests.
 - Release configuration check for secrets, debug flags, fixture routes, logging, and territory.
 - Final provenance/hash verification for all curated demo outcomes.
+- Final Maestro suite against the release-candidate Simulator build.
 
 ### Live validation
 
-- Use Computer Use to run a clean Simulator release build from first launch through all non-camera golden paths.
-- Install the exact release candidate on the iPhone and run the complete physical golden suite.
+- Use Computer Use to run a clean Simulator release build from first launch through every deterministic golden path and every important failure/recovery state.
+- Install the exact release candidate on the iPhone and have the user run the consolidated physical suite: barcode, cover, focus/torch, haptics, performance, Apple Books import/reopen, Files, and representative generated/PDF-derived EPUB reading checks.
 - Rehearse the public demo using the same books, network, backend, and build that will be shown.
 - Test one controlled failure so the demo has a graceful recovery if a live source is unavailable.
 
@@ -747,16 +758,16 @@ Choose direct Xcode installation or paid TestFlight distribution, run the final 
 
 | Product capability | Primary phase | Final verification |
 |---|---:|---:|
-| Native app/backend/test foundation | 0 | 11 |
+| Expo app/backend/test foundation | 0 | 11 |
 | Manual ISBN/title fallback | 1 | 9 |
 | Candidate normalization and confirmation | 1 | 9 |
-| ISBN barcode scanning | 2 | 9 and 11 |
+| ISBN barcode scanning | 2 | 11 physical gate |
 | Hybrid auto/manual capture | 2 | 10 |
-| Front-cover OCR and matching | 3 | 9 and 11 |
+| Front-cover OCR and matching | 3 | 9 fixtures and 11 physical gate |
 | Work-versus-edition distinction | 1 and 4 | 9 |
 | Rights decision engine | 4 | 9 and 11 |
 | Standard Ebooks existing EPUB | 4 | 5 and 11 |
-| Apple Books handoff | 5 | 9 and 11 |
+| Apple Books handoff | 5 | 11 physical gate |
 | Save to Files | 5 | 9 and 11 |
 | Project Gutenberg | 6 | 9 |
 | Google full-public-domain acquisition | 6 | 9 |
@@ -776,19 +787,21 @@ Choose direct Xcode installation or paid TestFlight distribution, run the final 
 ### I can perform independently once Xcode is installed
 
 - Backend unit, integration, contract, security, and source-fixture tests
-- Swift unit and UI tests
-- Clean builds with Xcode command-line tools
+- TypeScript state, React Native component, and app/backend contract tests
+- Maestro E2E flows against installable iOS Simulator builds
+- Clean Expo Go, Expo development, and release-candidate Simulator launches/builds as each becomes relevant
 - Simulator launches and interactions
-- Computer Use inspection of Xcode and Simulator
+- Extensive Computer Use inspection and interaction in Simulator after every phase
 - Files export inside Simulator
 - Visual regression and accessibility checks
+- Deterministic barcode, cover upload, ambiguity, source, conversion, sharing, and failure scenarios
 - Live low-volume provider smoke tests
 - Backend deployment and health validation when authorized during implementation
 
-### You will be needed for physical-device gates
+### You will be needed for setup and the final physical-device gate
 
-- Installing Xcode and signing in with your Apple Account
-- Pairing your iPhone and enabling Developer Mode
+- Installing full Xcode with an iOS Simulator runtime so I can perform Computer Use testing
+- Later, signing in with your Apple Account, pairing your iPhone, and enabling Developer Mode if the custom build path requires it
 - Holding books in front of the real camera
 - Evaluating scan framing, glare, haptics, and touch feel
 - Confirming Apple Books import on your device
@@ -796,11 +809,11 @@ Choose direct Xcode installation or paid TestFlight distribution, run the final 
 - Choosing whether to pay for Apple Developer Program membership and use TestFlight
 - Approving final visual polish and recording the demo
 
-These handoffs are concentrated at explicit exit gates so they do not interrupt every small implementation step.
+Apart from installing Xcode for Simulator access, these handoffs are concentrated in Phase 11 so they do not interrupt the functional implementation phases.
 
 ## First milestone that proves the idea
 
-Phase 5 is the first major milestone. At that point, the UI is intentionally simple, source coverage is narrow, and EPUB generation has not yet been added—but a real physical book can travel through the entire honest pipeline:
+Phase 5 is the first major milestone. At that point, the UI is intentionally simple, source coverage is narrow, and EPUB generation has not yet been added—but the complete honest pipeline can be exercised in Simulator from a deterministic barcode or cover observation:
 
 ```text
 Scan cover or ISBN
@@ -809,5 +822,7 @@ Scan cover or ISBN
 → validate the EPUB and provenance
 → open it in Apple Books or save it to Files
 ```
+
+After Phase 10, the user repeats this flow with real physical books in the Phase 11 device pass. That final pass validates the camera and Apple Books experience; it does not replace the automated and Computer Use evidence accumulated throughout implementation.
 
 That milestone proves the product before we invest in broader catalogs, document conversion, hardening, or visual polish.

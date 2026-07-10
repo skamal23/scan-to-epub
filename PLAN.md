@@ -18,7 +18,7 @@ The demo should feel like a small piece of magic:
 
 1. The app opens directly into a beautiful camera view.
 2. The user frames either the front cover or the ISBN barcode on the back.
-3. The app recognizes the book and asks for confirmation when necessary.
+3. The app recognizes the book locally from a barcode or, for a front cover, through an ephemeral backend recognition request, then asks for confirmation when necessary.
 4. It searches a controlled set of trustworthy legal sources.
 5. It explains when the available digital edition differs from the scanned physical edition.
 6. It obtains or creates a valid EPUB without altering the author's words.
@@ -30,7 +30,9 @@ The app requires no account, login, subscription, personal library, social graph
 
 | Area | Decision |
 |---|---|
-| Platform | Native iPhone app |
+| Platform | iPhone app built with Expo and React Native; no browser version |
+| Development runtime | Expo Go for the initial functional phases; an Expo development build when custom native code or configuration is needed |
+| Shipping runtime | A standalone signed iOS build; users never need Expo Go |
 | Initial territory | United States only |
 | Initial language | English-language recognition and books |
 | Capture model | Hybrid: confidence-gated automatic capture plus a manual shutter |
@@ -44,7 +46,7 @@ The app requires no account, login, subscription, personal library, social graph
 | PDF conversion | Rights-cleared, text-based PDFs only, gated by layout and fidelity checks |
 | AI-generated rewriting | Explicitly prohibited |
 | Backend | Small stateless open-source service for catalog resolution, rights decisions, conversion, and validation |
-| Image privacy | Cover photos remain on the device in the normal path |
+| Image privacy | Barcode data stays on-device; a front-cover crop is uploaded only for identification, processed ephemerally, excluded from logs, and deleted immediately afterward |
 | Content scope | Public-domain and explicitly open-licensed files only |
 | Distribution target | On-device demo/TestFlight first; App Store hardening later |
 
@@ -88,9 +90,9 @@ flowchart TD
     B --> C{"ISBN barcode detected?"}
     C -->|Yes| D["Validate ISBN and resolve edition"]
     C -->|No| E["Capture cover crop"]
-    E --> F["OCR title and author"]
-    F --> G["Retrieve metadata candidates"]
-    G --> H["Rank text and cover similarity"]
+    E --> F["Upload temporary cover crop"]
+    F --> G["OCR and retrieve metadata candidates"]
+    G --> H["Rank text and cover similarity, then delete crop"]
     D --> I["Resolve edition to underlying work"]
     H --> J{"Confidence"}
     J -->|High| I
@@ -116,7 +118,7 @@ The app shows one concise explanation before requesting camera access:
 
 - Scan a cover or ISBN barcode.
 - The camera is used only to identify the book.
-- Cover photos stay on the device in the normal flow.
+- ISBN scans stay on the device. A cover crop is sent securely to the recognition service only when the user scans the front, then deleted after identification.
 
 The system camera permission prompt follows. There is no multi-page onboarding. If permission is denied, the app offers two routes: open Settings or search manually by title and author.
 
@@ -126,11 +128,11 @@ The scanner is a dark, minimal full-screen camera experience with four adaptive 
 
 The persistent instruction is short: “Scan a cover or ISBN.” A quieter secondary hint can state that the barcode is fastest.
 
-The scanner watches for both text and EAN-13 barcodes. Its behavior is hybrid:
+The scanner watches for EAN-13 barcodes and keeps a cover shutter available. Its behavior is hybrid:
 
 - A valid, stable ISBN barcode triggers automatic capture quickly.
-- A likely cover triggers automatic capture only after the book boundary and recognized text remain stable.
-- A small shutter remains available at all times.
+- A front cover is captured with the shutter in the Expo Go build; a later native module may add confidence-gated automatic cover capture if it materially improves the experience.
+- The shutter remains available at all times.
 - The user can pinch to zoom and tap to focus.
 - A brief visual freeze and subtle haptic confirm capture.
 
@@ -173,9 +175,9 @@ The result prioritizes clarity rather than legal density. A compact “Verified 
 The ready screen contains the digital edition's authorized cover, title, author, source, and two clear actions:
 
 1. **Open in Books** — presents the iOS share workflow with a brief instruction to choose Books. Apple does not document a public API for silently inserting arbitrary local EPUBs into a user's Books library.
-2. **Save to Files** — presents the system document picker at a location chosen by the user.
+2. **Save to Files** — presents the iOS share workflow with a brief instruction to choose Save to Files and then a location.
 
-The app retains the temporary EPUB long enough to complete either action, then removes it according to the cleanup policy. If the user cancels the share or save sheet, the ready screen remains available.
+The app retains the temporary EPUB long enough to complete either action, then removes it according to the cleanup policy. If the user cancels the share workflow, the ready screen remains available.
 
 ## 6. Recognition pipeline
 
@@ -183,7 +185,9 @@ The app retains the temporary EPUB long enough to complete either action, then r
 
 The most accurate design is a layered evidence system, not a single multimodal prompt. Barcode decoding, OCR, metadata search, and image similarity each provide independently verifiable evidence. A general AI model introduces cost, latency, privacy concerns, and the possibility of fabricated ISBNs.
 
-The normal path uses Apple's on-device camera and Vision capabilities. VisionKit can recognize text and barcodes in live video, capture a high-resolution photo, and expose a custom overlay region. Vision can generate image feature prints whose distances can compare the captured cover with candidate cover images. Relevant Apple documentation includes [DataScannerViewController](https://developer.apple.com/documentation/visionkit/datascannerviewcontroller), [text recognition](https://developer.apple.com/documentation/vision/recognizetextrequest), and [feature-print comparison](https://developer.apple.com/documentation/vision/vnfeatureprintobservation).
+The Expo app uses `expo-camera` for the live preview, photo capture, and ISBN barcode observations. Expo Camera is available in Expo Go, supports barcode detection, and uses Apple's modern scanner for its iOS scanning path. [Expo Camera](https://docs.expo.dev/versions/latest/sdk/camera/)
+
+For the initial Expo Go demo, front-cover OCR and candidate-cover comparison run in the stateless backend. This keeps the first build testable without custom Swift modules while preserving a deterministic evidence pipeline. The backend receives only the cropped cover needed for recognition, does not persist it, and deletes it after producing candidates. If later profiling shows a meaningful privacy, latency, or offline benefit, an Expo development build can add a small native Apple Vision module without rewriting the React Native application. Expo describes a development build as a customizable version of Expo Go that can include arbitrary native libraries and configuration. [Expo development builds](https://docs.expo.dev/develop/development-builds/introduction/)
 
 A multimodal model is not needed in the first demo. If added later, it may only propose search terms; its output must still be corroborated by a book metadata source before appearing as an identification.
 
@@ -204,16 +208,17 @@ ISBN identifies a particular edition and format, which is why it is valuable for
 
 The front-cover path works as follows:
 
-1. Detect the largest plausible book/document quadrilateral inside the scan region.
-2. Wait for stable geometry or accept the manual shutter.
-3. Capture a high-resolution image and correct perspective for the detected cover.
-4. Run accurate on-device OCR with language correction.
+1. Ask the user to place the cover inside the adaptive guide and use the manual shutter.
+2. Preserve a clean camera boundary so a later Expo development build can add native book-boundary detection without changing the rest of the flow.
+3. Capture a high-resolution image, crop it to the guide, compress it within a strict request limit, and upload it over HTTPS to the recognition endpoint.
+4. Correct perspective and run accurate backend OCR with English-language correction.
 5. Normalize punctuation, line breaks, diacritics, case, and common OCR spacing errors without rewriting words.
 6. Extract likely title, subtitle, author, series, and publisher tokens from their relative position and size.
 7. Query book metadata using several conservative title/author combinations.
-8. Retrieve a small candidate set and their available cover thumbnails.
+8. Retrieve a small candidate set and their permitted cover thumbnails.
 9. Rank candidates using text similarity, author agreement, cover-image similarity, language, and publication clues.
-10. Auto-select only when one candidate clearly outranks the others; otherwise ask the user.
+10. Delete the uploaded crop and intermediate image data whether recognition succeeds, fails, or times out.
+11. Auto-select only when one candidate clearly outranks the others; otherwise ask the user.
 
 Cover-image comparison happens only after OCR narrows the search. Attempting global visual search across millions of covers would require a large licensed cover index and is unnecessary for this demo.
 
@@ -426,23 +431,24 @@ Image-only or scanned PDFs still require whole-book OCR and are outside the firs
 
 ### 10.1 iPhone app responsibilities
 
-The native app owns:
+The Expo/React Native app owns:
 
 - Camera permission and live scanner experience
 - Barcode recognition and ISBN validation
-- Cover detection, capture, perspective correction, and OCR
-- Local cover-image comparison against returned candidates
+- Cover framing, capture, cropping, request compression, and upload disclosure
 - Confidence presentation and user confirmation
 - Download progress and temporary-file management
 - Provenance and rights explanation screens
 - Apple Books share workflow and Files export
 - Accessible feedback, animation, and recovery states
+- A development-only deterministic scenario harness that reaches every important state without camera hardware
 
 ### 10.2 Stateless backend responsibilities
 
 The small open-source backend owns:
 
 - Protecting third-party API keys and identifying the project to source APIs
+- Ephemeral front-cover OCR, perspective normalization, and candidate-cover comparison
 - Normalizing Google Books and Open Library metadata
 - Maintaining the manually reviewed demo catalog
 - Mapping physical editions to underlying works
@@ -453,19 +459,27 @@ The small open-source backend owns:
 - Returning a short-lived result and provenance record
 - Enforcing request-size limits, source allowlists, timeouts, and abuse-rate limits without creating user accounts
 
-It does not require accounts, profiles, personal libraries, or persistent scan history. It does not receive cover images in the normal path. The request contains recognized text or a validated ISBN; candidate cover images are returned for local comparison.
+It does not require accounts, profiles, personal libraries, or persistent scan history. ISBN requests contain only a validated identifier. Front-cover requests contain a bounded cover crop used only for recognition; image bodies and derived image features are excluded from logs and deleted after the request.
 
 For a real-device demo, this service is deployed to a small HTTPS endpoint with a health check and a reproducible deployment, rather than depending on a developer laptop being reachable. A local deployment remains available for development and automated tests.
 
-### 10.3 Why the backend is justified for a demo
+### 10.3 Expo application strategy
+
+Expo Go is the initial development runtime because it provides the camera, networking, file, and sharing capabilities required for the functional demo while preserving a fast QR-code and Fast Refresh workflow. It is a development tool, not the distributed product.
+
+The project moves to an Expo development build when it first needs custom native code, native configuration unavailable in Expo Go, stable simulator E2E binaries, or release-candidate behavior. The React Native screens, state model, backend contracts, and test fixtures remain the same. Only the runtime container changes. A final user installs the standalone app or TestFlight build and never needs Expo Go.
+
+The downloaded EPUB is written to the app's temporary storage and handed to the native iOS action sheet through Expo Sharing. Expo Sharing supports local-file sharing on iOS and is included in Expo Go. [Expo Sharing](https://docs.expo.dev/versions/latest/sdk/sharing/)
+
+### 10.4 Why the backend is justified for a demo
 
 An entirely on-device app would expose API keys, make catalog/rate-limit behavior harder to control, require shipping Java-based EPUBCheck or replacing it with a weaker check, and make rights rules difficult to update. A stateless backend preserves the no-auth experience while making the legal and content pipeline inspectable and reliable.
 
 The backend remains replaceable. Scanner, identification, rights decision, acquisition, and export communicate through explicit product-level states so the demo does not become a single opaque service call.
 
-### 10.4 Open-source posture
+### 10.5 Open-source posture
 
-The iOS application code, backend code, catalog schema, source adapters, rights rules, and EPUB-generation pipeline can all be published in the project repository. EPUBCheck is open source, and the EPUB format is an open W3C standard.
+The Expo/React Native application code, backend code, catalog schema, source adapters, rights rules, recognition pipeline, and EPUB-generation pipeline can all be published in the project repository. EPUBCheck is open source, and the EPUB format is an open W3C standard.
 
 The complete runtime is not literally composed only of open-source software: an iOS app necessarily uses Apple's proprietary platform frameworks, and Google Books is an external public API rather than open-source software. The accurate claim is that the project itself is open source and uses open standards plus legal open-content sources—not that every platform dependency is open source.
 
@@ -546,7 +560,7 @@ Apple's guidance recommends clear status feedback through multiple modalities an
 | EPUB is malformed or unsafe | Do not export it | Try another approved edition |
 | Network disappears mid-flow | Preserve captured metadata locally for the session | Retry without rescanning |
 | Apple Books is not installed/available | Do not promise it | Save to Files or use another compatible app |
-| User cancels share or Files picker | Return to ready screen | Try either export action again |
+| User cancels the share workflow | Return to ready screen | Try either export action again |
 
 No error path broadens the search to unapproved sources.
 
@@ -557,8 +571,9 @@ No error path broadens the search to unapproved sources.
 - No account or login
 - No contact, photo-library, location, or tracking permission
 - Camera permission requested only when the scanner is shown
-- Cover images processed locally and deleted after the session
-- Backend receives a validated ISBN or normalized OCR terms, not the cover photo in the normal flow
+- Barcode observations are validated locally and sent as ISBN text only
+- Front-cover recognition uploads one bounded crop over HTTPS only after camera permission and clear in-app disclosure
+- Uploaded cover crops and derived image features are held only for the active request, excluded from application logs and backups, and deleted on success, failure, cancellation, or timeout
 - No advertising SDKs
 - No behavioral analytics in the first demo
 - Operational logs omit cover images and minimize or hash book-query data
@@ -612,6 +627,12 @@ Testing must prove four independent claims:
 2. It never delivers a file without acceptable rights evidence.
 3. Every delivered file is safe, valid, and usable in Apple Books/Files.
 4. The user can complete or recover from every state without developer intervention.
+
+Every implementation phase also has an interaction gate. After automated tests pass, the app is launched in iOS Simulator and exercised through Computer Use. The walkthrough covers the phase's primary flow, alternate states, cancellation, retry, offline behavior, long content, and visible regressions. Simulator evidence is recorded before the phase is accepted.
+
+Because iOS Simulator has no camera hardware, development builds include a hidden fixture/scenario launcher that injects deterministic barcode, cover, candidate, source, conversion, and failure observations at the camera boundary. These observations then travel through the same production state, networking, confirmation, conversion, download, and export code. The harness is unavailable in release builds. [Expo iOS Simulator limitations](https://docs.expo.dev/workflow/ios-simulator/)
+
+Camera accuracy, focus, torch, haptics, device heat, and real Apple Books behavior are deferred to a consolidated physical-iPhone acceptance pass performed by the user after the functional implementation is complete. A phase may therefore be functionally complete with camera hardware explicitly marked unverified; the final demo cannot be declared device-ready until that pass succeeds.
 
 ### 15.1 Recognition test corpus
 
@@ -705,6 +726,9 @@ For generated EPUBs:
 ### 15.5 User-interface and accessibility tests
 
 - Every state can be reached with deterministic test data
+- Every phase receives a Computer Use walkthrough in iOS Simulator after automated tests pass
+- Key paths have repeatable Maestro E2E coverage against an installable simulator build
+- Screenshots are captured for important states and later used for visual-regression comparison
 - Camera permission allowed, denied, restricted, and later restored
 - Automatic capture does not trigger repeatedly
 - Manual shutter is always operable
@@ -731,19 +755,23 @@ For generated EPUBs:
 11. **No network:** capture successfully, preserve the observation, reconnect, and finish without rescanning.
 12. **Books unavailable:** finish acquisition and save to Files instead.
 
-### 15.7 Device and release verification
+### 15.7 Simulator, Computer Use, and device verification
 
-Test on real iPhones rather than relying only on the simulator. The matrix includes:
+During implementation, Simulator and Computer Use are the primary visual and behavioral acceptance environment. The matrix includes small and large simulated iPhones, supported iOS versions available locally, light and dark appearance, large text, VoiceOver-oriented labeling checks, Reduce Motion, slow/offline networking, and every deterministic scenario. Expo supports local and hosted Maestro flows against iOS Simulator builds, so critical journeys are both automated and manually inspected. [Expo Maestro E2E guide](https://docs.expo.dev/eas/workflows/examples/e2e-tests/)
 
-- The oldest supported iPhone/iOS combination capable of the selected VisionKit workflow
+After the functional and visual phases are complete, run a consolidated real-device matrix:
+
+- The oldest supported iPhone/iOS combination capable of the selected Expo Camera workflow
 - A common mid-generation iPhone
 - A current-generation iPhone
 - The oldest supported OS and the current public OS
 - At least one device with a smaller display and one larger display
 
-The release candidate is filmed only after the same build passes the complete golden scenario suite without developer menus, network interception, or manual data injection.
+The release candidate is filmed only after the same build passes the complete golden scenario suite without developer menus, network interception, or manual data injection. Until the user completes this final device pass, reports must say that camera hardware and Apple Books acceptance remain pending.
 
 ## 16. Delivery phases
+
+This section is the high-level product sequence. The phase-by-phase backend, Expo app, automated-test, Computer Use, exit-gate, and user-handoff checklist is maintained in [phases.md](./phases.md).
 
 ### Phase 1 — Prove the complete seam
 
@@ -761,9 +789,9 @@ This phase establishes that all system boundaries work end to end.
 ### Phase 2 — Add front-cover recognition
 
 - Hybrid automatic/manual capture
-- Cover crop and OCR
+- Cover crop and ephemeral backend OCR
 - Metadata candidate search
-- Local cover-image similarity
+- Backend candidate-cover similarity
 - Confidence states and confirmation sheet
 - Rescan and manual-search recovery
 
@@ -792,6 +820,8 @@ Generation can be omitted from the first public video if it delays a reliable ex
 ### Phase 5 — Polish and harden
 
 - Final animation and haptic language
+- Expo Go-to-development-build migration if it has not already been required
+- Deterministic Simulator scenario harness and Maestro golden flows
 - Full failure-state copy
 - Accessibility pass
 - Privacy and legal details
@@ -804,7 +834,7 @@ Generation can be omitted from the first public video if it delays a reliable ex
 The demo is complete when all of the following are true:
 
 - It launches directly into an understandable scanner with no account requirement.
-- Hybrid capture works for front covers and valid ISBN barcodes.
+- Hybrid capture supports automatic valid-ISBN scanning and manual front-cover capture.
 - The recognition test corpus meets the defined accuracy targets.
 - The app distinguishes the scanned physical edition from the authorized digital edition.
 - At least 25 reviewed works have reliable approved acquisition outcomes.
@@ -814,7 +844,7 @@ The demo is complete when all of the following are true:
 - Every PDF-derived EPUB passes reading-order, completeness, and artifact checks; ineligible PDFs fail without export.
 - Existing and generated EPUBs open successfully in Apple Books on real devices.
 - Saving to Files works and preserves a usable filename and extension.
-- Camera images are not retained or uploaded in the normal path.
+- Barcode scans do not upload images; front-cover crops are uploaded only for recognition and are never retained after the request.
 - All critical errors have a user-controlled recovery path.
 - VoiceOver, Dynamic Type, contrast, and Reduce Motion have been verified.
 - The exact build intended for the demo passes the end-to-end golden scenarios.
