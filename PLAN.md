@@ -6,7 +6,7 @@ This document defines a polished, rights-aware iPhone demo that turns a camera s
 
 It describes what the product is, the end-to-end pipeline, the sources it trusts, the legal and privacy rules it enforces, the major user-interface states, the failure experience, and how the finished demo will be tested. It intentionally does not prescribe implementation code or settle pixel-level visual design; those decisions will be made during implementation and visual iteration.
 
-The product is not a system for digitizing arbitrary copyrighted books. It is a discovery and delivery layer for public-domain and openly licensed digital editions that already exist, with a narrow deterministic conversion fallback for authorized HTML or structured text.
+The product is not a system for digitizing arbitrary copyrighted books. It is a discovery and delivery layer for public-domain and openly licensed digital editions that already exist, with a narrow deterministic conversion fallback for authorized HTML, structured text, and eligible text-based PDFs.
 
 ## 2. Product summary
 
@@ -41,6 +41,7 @@ The app requires no account, login, subscription, personal library, social graph
 | Secondary output | Save a copy to Files |
 | Built-in reader | Not included in the first demo |
 | Whole-book scanning/OCR | Explicitly excluded |
+| PDF conversion | Rights-cleared, text-based PDFs only, gated by layout and fidelity checks |
 | AI-generated rewriting | Explicitly prohibited |
 | Backend | Small stateless open-source service for catalog resolution, rights decisions, conversion, and validation |
 | Image privacy | Cover photos remain on the device in the normal path |
@@ -69,7 +70,7 @@ A terms page is not the safety mechanism. The source allowlist, license rules, t
 
 ### 4.5 Prefer an existing EPUB
 
-The highest-quality and lowest-risk path is to deliver an authorized EPUB produced by a reputable source. EPUB generation is a fallback for clean authorized HTML or structured text, not the default.
+The highest-quality and lowest-risk path is to deliver an authorized EPUB produced by a reputable source. EPUB generation is a fallback for clean authorized HTML, structured text, or a text-based PDF that passes strict extraction and layout checks; it is not the default.
 
 ### 4.6 No generative changes to book text
 
@@ -100,6 +101,8 @@ flowchart TD
     M --> N["Rights and territory decision"]
     N -->|Existing authorized EPUB| O["Acquire and verify file"]
     N -->|Authorized HTML or text| P["Deterministically build and validate EPUB"]
+    N -->|Authorized text-based PDF| U["Extract structure and run fidelity gate"]
+    U --> P
     N -->|No allowed source| Q["Identified, but no legal open edition"]
     O --> R["Ready screen with provenance"]
     P --> R
@@ -250,19 +253,19 @@ The source resolver is an allowlisted adapter system. A generic web search is ne
 |---|---|---|---|
 | Standard Ebooks | Preferred source for polished classics | Existing EPUB | U.S. public-domain scope; preserve its edition and provenance |
 | Project Gutenberg | Broad public-domain fallback | Existing EPUB, or selected HTML/text for deterministic conversion | U.S. territory; use official catalog/feed and respectful direct-download behavior |
-| Google Books | Metadata plus limited public-domain acquisition | EPUB only when explicitly available as full public domain | Require `FULL_PUBLIC_DOMAIN`, country match, and an actual EPUB download link |
-| OAPEN | Modern open-access scholarly books | Existing EPUB bitstream | Require an explicit acceptable license and matching record/file |
-| DOAB | Discovery directory for open-access books | Publisher/OAPEN EPUB linked from a record | Re-check the item license and final content host; DOAB itself does not host the file |
+| Google Books | Metadata plus limited public-domain acquisition | EPUB, or eligible text-based PDF as a conversion source | Require `FULL_PUBLIC_DOMAIN`, country match, and an actual download link |
+| OAPEN | Modern open-access scholarly books | Existing EPUB or eligible text-based PDF bitstream | Require an explicit acceptable license and matching record/file |
+| DOAB | Discovery directory for open-access books | Publisher/OAPEN EPUB or eligible text-based PDF linked from a record | Re-check the item license and final content host; DOAB itself does not host the file |
 
 Standard Ebooks is the preferred demo result because its files are carefully produced, accessible, and dedicated to the public domain in the United States. Its complete OPDS feeds have access conditions, including a path for qualifying open-source projects, so the demo initially uses a manually reviewed catalog and requests formal feed access if the project expands. [Standard Ebooks](https://standardebooks.org/), [feed access](https://standardebooks.org/collections/glad-books/feeds)
 
 Project Gutenberg publishes OPDS and machine-readable catalogs, but its public site is not intended for aggressive automated traffic or high-volume proxying. The demo makes user-initiated, low-volume requests with an identifiable user agent and uses an approved download route or mirror. [Project Gutenberg catalogs](https://www.gutenberg.org/ebooks/offline_catalogs.html), [robot-access policy](https://www.gutenberg.org/policy/robot_access.html)
 
-Google Books access information is territorial. The resolver must require a U.S. country result, `FULL_PUBLIC_DOMAIN`, EPUB availability, and a download link. A partial preview, all-pages browser view, purchase link, or PDF-only result does not qualify. [Google Books volume fields](https://developers.google.com/books/docs/v1/reference/volumes)
+Google Books access information is territorial. The resolver must require a U.S. country result, `FULL_PUBLIC_DOMAIN`, and an actual download link. An EPUB can proceed directly to validation. A PDF-only result may enter the conditional PDF-conversion path, but only if the downloaded file is text-based and passes every rights, layout, and fidelity gate. A partial preview, browser-only view, purchase link, or sample does not qualify. [Google Books volume fields](https://developers.google.com/books/docs/v1/reference/volumes)
 
 Google Books files are acquired only through the official user-initiated download link for that result. The demo does not mirror or permanently cache Google API content.
 
-OAPEN exposes metadata and bitstreams through its REST API and accepts both PDF and EPUB deposits. The MVP takes only existing EPUB bitstreams. [OAPEN REST API](https://www.oapen.org/article/8185269-search-using-a-rest-api), [OAPEN file formats](https://www.oapen.org/publishers/11625552-upload-instructions)
+OAPEN exposes metadata and bitstreams through its REST API and accepts both PDF and EPUB deposits. The MVP prefers existing EPUB bitstreams and may convert an authorized text-based PDF when it passes the PDF eligibility gates. [OAPEN REST API](https://www.oapen.org/article/8185269-search-using-a-rest-api), [OAPEN file formats](https://www.oapen.org/publishers/11625552-upload-instructions)
 
 DOAB records carry license information and download URLs but DOAB is a directory rather than a content host. The app must validate the license and destination for every result. [DOAB FAQ](https://doabooks.org/en/researchers/full-faq)
 
@@ -291,7 +294,7 @@ DOAB records carry license information and download URLs but DOAB is a directory
 Every content candidate passes through a deterministic rights decision before acquisition. The decision produces one of four outcomes:
 
 1. **Deliver exact EPUB** — an existing EPUB is explicitly permitted.
-2. **Generate EPUB** — authorized HTML or structured text may be transformed and redistributed.
+2. **Generate EPUB** — authorized HTML, structured text, or an eligible text-based PDF may be transformed and redistributed.
 3. **Open at source only** — the item is free to read but redistribution or transformation is not established.
 4. **Reject** — the license, territory, source, or file is unacceptable.
 
@@ -365,7 +368,7 @@ The app should not “clean up” or repackage a valid source EPUB merely to add
 
 ### 9.2 Generated EPUB path
 
-Generation is deliberately narrow. It is allowed only from reviewed HTML, XHTML, XML, or plain text whose rights evidence permits redistribution and transformation.
+Generation is deliberately narrow. It is allowed only from reviewed HTML, XHTML, XML, plain text, or an eligible text-based PDF whose rights evidence permits redistribution and transformation.
 
 The generation process may:
 
@@ -383,14 +386,41 @@ It may not:
 - Modernize spelling or punctuation
 - Translate or abridge text
 - Infer missing passages
-- Convert arbitrary scanned PDFs
+- Convert image-only scans or complex PDFs that fail the PDF quality gates
 - Include illustrations without separate rights evidence
 
 Every generated file targets EPUB 3.3, includes a package document and navigation document, and passes EPUBCheck before release. EPUB 3.3 defines the container, package, spine, manifest, content, and navigation requirements; EPUBCheck is the official conformance checker maintained for W3C. [EPUB 3.3](https://www.w3.org/TR/epub-33/), [EPUBCheck](https://www.w3.org/publishing/epubcheck/)
 
-### 9.3 Why PDF conversion is excluded
+### 9.3 Conditional PDF-to-EPUB path
 
-PDF-to-EPUB reflow is a separate product. Reading order, repeated headers, columns, hyphenation, footnotes, tables, mathematics, captions, and image placement can all be damaged even when OCR is accurate. For the demo, a PDF-only result is reported as unavailable for Apple Books EPUB export rather than silently converted into a poor book.
+PDF conversion is supported when the file contains a reliable text layer and a layout that can be reconstructed without inventing reading order. Rights approval happens before any conversion work; being downloadable as a PDF does not itself authorize transformation or redistribution.
+
+The PDF first passes an eligibility analysis:
+
+1. Confirm that the source, license, and U.S. territory permit the app to create and deliver the EPUB.
+2. Download and inspect the PDF using the same safe-file rules applied to EPUB acquisition.
+3. Determine whether it is born-digital or contains a high-quality extractable text layer.
+4. Measure text extraction coverage, character quality, page consistency, and whether reading order can be determined reliably.
+5. Classify the layout: simple single-column prose is favored; ambiguous columns, dense tables, mathematical notation, forms, marginalia, and image-led layouts fail the automatic gate.
+6. Confirm that embedded images and fonts can either be reused legally or omitted without damaging the work.
+
+An eligible PDF enters a deterministic conversion pipeline:
+
+- Extract text blocks together with page position, font size, emphasis, and image references.
+- Detect and remove repeated running headers, footers, and page numbers.
+- Reconstruct paragraphs and undo line-end hyphenation only when the neighboring text provides clear evidence.
+- Infer headings and chapter boundaries from repeated layout patterns.
+- Preserve simple footnotes, captions, and images when their relationships are unambiguous and rights-cleared.
+- Produce structured intermediate HTML rather than writing directly to an EPUB archive.
+- Compare normalized extracted content with the intermediate HTML to detect missing, duplicated, reordered, or unexpectedly changed text.
+- Generate the EPUB using the same metadata, attribution, navigation, accessibility, and cover rules as other generated editions.
+- Run EPUBCheck and the final text-integrity checks before making the file available.
+
+No generative model rewrites or fills in PDF content. If automatic extraction cannot establish trustworthy reading order or content completeness, the app stops with a specific message such as “We found an authorized PDF, but could not safely convert its layout into an EPUB.” It may offer the source page for transparency, but it does not export a damaged EPUB.
+
+The fidelity gate is fail-closed: after normalizing whitespace and approved line-end dehyphenation, every body-text block from the eligible PDF must be accounted for exactly once in the expected reading order. Every removed block must be classified and recorded as a repeated header, footer, or page number. Any unexplained omission, duplication, or ordering ambiguity rejects the conversion.
+
+Image-only or scanned PDFs still require whole-book OCR and are outside the first demo. They can be evaluated later as a separate rights-restricted feature with page-level confidence, human review, and much stronger fidelity testing.
 
 ## 10. System shape
 
@@ -509,7 +539,7 @@ Apple's guidance recommends clear status feedback through multiple modalities an
 | Multiple plausible books | Present up to three candidates | Select one, rescan, or manual search |
 | Metadata services disagree | Do not auto-confirm | Ask user and show identifying details |
 | Book identified but no open edition exists | Honest unavailable state | Scan another book; optionally copy book details |
-| Source has PDF only | Explain that no EPUB is available from an approved source | View source information; no automatic PDF conversion |
+| Source has PDF only | Check its rights, text layer, reading order, and layout complexity | Convert when every gate passes; otherwise explain why safe EPUB conversion was unavailable |
 | License is unclear or incompatible | Treat as unavailable | Show that the source could not be verified |
 | Source is temporarily offline | Preserve book identification | Retry source check or return later |
 | Download is not an EPUB | Reject the response | Try the next approved source |
@@ -563,6 +593,7 @@ The catalog should contain:
 - Famous public-domain novels with many modern physical covers
 - At least several books with reliable back-cover ISBN metadata
 - A few OAPEN books with exact open-access EPUBs and ISBNs
+- At least two rights-cleared, text-based PDFs selected to exercise the conditional conversion path
 - Covers with ornate typography, minimal typography, subtitles, and author prominence
 - Intentional negative examples: modern copyrighted books with no authorized open edition
 - Ambiguous titles that require candidate selection
@@ -667,6 +698,9 @@ For generated EPUBs:
 - Attribution and transformation notice are present
 - The original and final hashes are recorded
 - The file opens in Apple Books at small and large font settings
+- Every PDF body-text block is accounted for exactly once in expected reading order, apart from recorded headers, footers, and page numbers
+- PDF pages with repeated headers, footers, and page numbers do not leak those artifacts into chapter text
+- A complex or image-only PDF fails closed rather than producing an EPUB
 
 ### 15.5 User-interface and accessibility tests
 
@@ -686,14 +720,16 @@ For generated EPUBs:
 
 1. **Front-cover success:** scan a recognizable *Pride and Prejudice* cover, confirm the work, obtain a Standard Ebooks edition, open it in Books.
 2. **Barcode success:** scan a modern physical edition of a public-domain classic, resolve its ISBN to the work, explain the different digital edition, save it to Files.
-3. **Open-access ISBN success:** scan a reviewed OAPEN title with an authorized EPUB and display its license attribution.
-4. **Ambiguous result:** scan a title shared by multiple works and select from candidates.
-5. **No legal edition:** scan a current copyrighted bestseller, identify it correctly, and stop at the unavailable state.
-6. **Difficult cover:** fail to read an ornate front cover, then recover by scanning the back barcode.
-7. **Source outage:** identify the book, simulate the preferred source being unavailable, and either use the next approved source or show retry.
-8. **Unsafe file:** simulate an invalid or oversized EPUB and prove it is never exported.
-9. **No network:** capture successfully, preserve the observation, reconnect, and finish without rescanning.
-10. **Books unavailable:** finish acquisition and save to Files instead.
+3. **Open-access EPUB success:** scan a reviewed OAPEN title with an authorized EPUB and display its license attribution.
+4. **PDF conversion success:** scan a reviewed title whose only approved source is a simple text-based PDF, convert it, verify content fidelity, and open the resulting EPUB in Books.
+5. **PDF conversion refusal:** find an authorized but complex or image-only PDF and prove the app explains why it cannot safely convert it.
+6. **Ambiguous result:** scan a title shared by multiple works and select from candidates.
+7. **No legal edition:** scan a current copyrighted bestseller, identify it correctly, and stop at the unavailable state.
+8. **Difficult cover:** fail to read an ornate front cover, then recover by scanning the back barcode.
+9. **Source outage:** identify the book, simulate the preferred source being unavailable, and either use the next approved source or show retry.
+10. **Unsafe file:** simulate an invalid or oversized EPUB and prove it is never exported.
+11. **No network:** capture successfully, preserve the observation, reconnect, and finish without rescanning.
+12. **Books unavailable:** finish acquisition and save to Files instead.
 
 ### 15.7 Device and release verification
 
@@ -736,13 +772,16 @@ This phase establishes that all system boundaries work end to end.
 - Curated Standard Ebooks catalog
 - Project Gutenberg adapter
 - Google Books public-domain rules
-- OAPEN and DOAB adapters for existing EPUBs
+- OAPEN and DOAB adapters for existing EPUBs and eligible text-based PDFs
 - Unified work/edition/source result
 - Provenance record and rights-detail sheet
 
 ### Phase 4 — Add deterministic EPUB generation
 
 - Only approved structured sources
+- Conditional extraction of rights-cleared text-based PDFs
+- PDF layout classification and fail-closed quality gates
+- Structured intermediate HTML and normalized text-fidelity comparison
 - Source-specific cleanup recipes
 - Original typographic cover when needed
 - Attribution, license, navigation, and accessibility metadata
@@ -772,6 +811,7 @@ The demo is complete when all of the following are true:
 - Negative copyrighted examples stop cleanly without suggesting unauthorized alternatives.
 - Every downloadable result has a provenance and rights record.
 - Every delivered EPUB passes EPUBCheck without conformance errors; generated EPUBs also pass text-integrity verification.
+- Every PDF-derived EPUB passes reading-order, completeness, and artifact checks; ineligible PDFs fail without export.
 - Existing and generated EPUBs open successfully in Apple Books on real devices.
 - Saving to Files works and preserves a usable filename and extension.
 - Camera images are not retained or uploaded in the normal path.
@@ -786,7 +826,7 @@ The first version will not:
 - Promise a free ebook for every physical book
 - Prove ownership of a physical copy
 - Scan an entire book or perform page-by-page OCR
-- Reconstruct an EPUB from an arbitrary PDF
+- Reconstruct an EPUB from an arbitrary, image-only, or structurally ambiguous PDF
 - Search shadow libraries or arbitrary web results
 - Bypass DRM, loans, subscriptions, previews, or paywalls
 - Include publisher-discount or ebook-purchase bundling
