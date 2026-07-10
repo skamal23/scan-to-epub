@@ -1,0 +1,66 @@
+appId: host.exp.Exponent
+name: Phase 1 manual identification flow
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Open scanner
+- tapOn: Search manually
+- assertVisible: Find your book
+- tapOn:
+    id: isbn-input
+- inputText: 9780141439518
+- tapOn: Find your book
+- tapOn: Find book
+- assertVisible: Is this the right book?
+- assertVisible: 1 possible match
+- tapOn: Choose Pride and Prejudice by Jane Austen
+- assertVisible: Work confirmed
+- assertVisible: Your physical edition
+- assertVisible: The open digital edition may differ.*
+- takeScreenshot: .maestro/artifacts/phase1-confirmed
+- tapOn: Edit search
+- tapOn: Back
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Ambiguous books
+    direction: DOWN
+- tapOn: Ambiguous books
+- assertVisible: 2 possible matches
+- assertVisible: Choose Invisible Man by Ralph Ellison
+- assertVisible: Choose The Invisible Man by H. G. Wells
+- tapOn: None of these
+- assertVisible: Find your book
+- tapOn: Back
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Catalog warning
+    direction: DOWN
+- tapOn: Catalog warning
+- assertVisible: Some catalogs were unavailable.*
+- tapOn: Edit search
+- tapOn: Back
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Search error
+    direction: DOWN
+- tapOn: Search error
+- assertVisible: Search unavailable
+- tapOn: Try again
+- assertVisible: Is this the right book?
+- tapOn: Edit search
+- tapOn: Back
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Long title and no cover
+    direction: DOWN
+- tapOn: Long title and no cover
+- assertVisible: Choose The Extremely Long and Unexpectedly Detailed Book Title That Must Still Fit on a Small Screen by Alexandra Example-With-A-Very-Long-Name
+- takeScreenshot: .maestro/artifacts/phase1-long-title

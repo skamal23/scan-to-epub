@@ -9,6 +9,8 @@ ALLOWED_ENVIRONMENTS = frozenset({"development", "fixture", "test", "production"
 class Settings:
     environment: str = "development"
     fixture_mode: bool = False
+    google_books_api_key: str | None = None
+    contact_email: str | None = None
 
     @classmethod
     def from_env(cls, values: Mapping[str, str] | None = None) -> "Settings":
@@ -19,4 +21,9 @@ class Settings:
 
         fixture_value = source.get("BOOK_FIXTURE_MODE", "false").strip().lower()
         fixture_mode = fixture_value in {"1", "true", "yes", "on"}
-        return cls(environment=environment, fixture_mode=fixture_mode)
+        return cls(
+            environment=environment,
+            fixture_mode=fixture_mode,
+            google_books_api_key=source.get("GOOGLE_BOOKS_API_KEY") or None,
+            contact_email=source.get("BOOK_CONTACT_EMAIL") or None,
+        )

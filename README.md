@@ -36,6 +36,14 @@ cd mobile
 pnpm ios
 ```
 
+`make backend-run` uses deterministic local book fixtures. To exercise live metadata, set `BOOK_CONTACT_EMAIL` so Open Library can identify the low-volume client, optionally set `GOOGLE_BOOKS_API_KEY`, and run:
+
+```bash
+BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backend-run-live
+```
+
+Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured.
+
 ### Expo Go on a physical iPhone
 
 Keep the Mac and iPhone on the same trusted Wi-Fi network, then run:
