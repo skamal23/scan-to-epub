@@ -76,8 +76,8 @@ describe('<App />', () => {
     await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
 
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
-    expect(view.getByText('Scan the ISBN barcode')).toBeTruthy();
-    expect(view.getByLabelText('ISBN scan guide')).toBeTruthy();
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByLabelText('Book scan guide')).toBeTruthy();
   });
 
   test('shows an unavailable state and retries successfully', async () => {
@@ -132,6 +132,20 @@ describe('<App />', () => {
     expect(view.getByText('Is this the right book?')).toBeTruthy();
     expect(view.getByText('2 possible matches')).toBeTruthy();
     expect(metadata.search).not.toHaveBeenCalled();
+  });
+
+  test('recognizes a deterministic cover and explains its confidence before confirmation', async () => {
+    const view = render(
+      <App client={healthyClient()} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Cover: strong match' }));
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+
+    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    expect(view.getByText('Strong cover match—please confirm the work.')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Scan again' })).toBeTruthy();
   });
 
   test('lets the deterministic search-error scenario recover through the real retry path', async () => {

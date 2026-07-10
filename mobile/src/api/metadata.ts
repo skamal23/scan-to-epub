@@ -125,7 +125,7 @@ export function decodeMetadataSearchResult(value: unknown): MetadataSearchResult
   ) {
     throw new ContractError('Metadata response did not match the contract');
   }
-  const candidates = value.candidates.map(decodeCandidate);
+  const candidates = value.candidates.map(decodeMetadataCandidate);
   return {
     observedIsbn: value.observedIsbn,
     candidates,
@@ -133,7 +133,7 @@ export function decodeMetadataSearchResult(value: unknown): MetadataSearchResult
   };
 }
 
-function decodeCandidate(value: unknown): MetadataCandidate {
+export function decodeMetadataCandidate(value: unknown): MetadataCandidate {
   if (
     !isRecord(value) ||
     typeof value.candidateId !== 'string' ||

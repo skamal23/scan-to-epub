@@ -1,0 +1,67 @@
+appId: host.exp.Exponent
+name: Phase 3 cover recognition states
+---
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: strong match"
+    direction: DOWN
+- tapOn: "Cover: strong match"
+- assertVisible: Scan a cover or ISBN
+- tapOn: Capture cover or detected ISBN
+- assertVisible: Is this the right book?
+- assertVisible: Strong cover match—please confirm the work.
+- assertVisible: Scan again
+- takeScreenshot: .maestro/artifacts/phase3-strong
+- tapOn: Scan again
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: ambiguous"
+    direction: DOWN
+- tapOn: "Cover: ambiguous"
+- tapOn: Capture cover or detected ISBN
+- assertVisible: A few cover matches are possible.*
+- assertVisible: Choose Invisible Man by Ralph Ellison
+- assertVisible: Choose The Invisible Man by H. G. Wells
+- tapOn: None—scan again
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: no match"
+    direction: DOWN
+- tapOn: "Cover: no match"
+- tapOn: Capture cover or detected ISBN
+- assertVisible: Couldn’t identify this cover
+- assertVisible: Try another cover
+- assertVisible: Scan the back barcode
+- assertVisible: Enter title manually
+- takeScreenshot: .maestro/artifacts/phase3-no-match
+- tapOn: Scan the back barcode
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: timeout"
+    direction: DOWN
+- tapOn: "Cover: timeout"
+- tapOn: Capture cover or detected ISBN
+- assertVisible: Cover recognition timed out
+- tapOn: Try another cover
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: processing"
+    direction: DOWN
+- tapOn: "Cover: processing"
+- tapOn: Capture cover or detected ISBN
+- assertVisible: Reading the cover…
+- assertVisible: Cancel
+- tapOn: Cancel
+- assertVisible: Scan a cover or ISBN
+- takeScreenshot: .maestro/artifacts/phase3-cancelled

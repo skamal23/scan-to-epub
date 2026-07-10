@@ -11,6 +11,8 @@ class Settings:
     fixture_mode: bool = False
     google_books_api_key: str | None = None
     contact_email: str | None = None
+    cover_max_bytes: int = 3_000_000
+    cover_timeout_seconds: float = 15.0
 
     @classmethod
     def from_env(cls, values: Mapping[str, str] | None = None) -> "Settings":
@@ -26,4 +28,6 @@ class Settings:
             fixture_mode=fixture_mode,
             google_books_api_key=source.get("GOOGLE_BOOKS_API_KEY") or None,
             contact_email=source.get("BOOK_CONTACT_EMAIL") or None,
+            cover_max_bytes=int(source.get("BOOK_COVER_MAX_BYTES", "3000000")),
+            cover_timeout_seconds=float(source.get("BOOK_COVER_TIMEOUT_SECONDS", "15")),
         )

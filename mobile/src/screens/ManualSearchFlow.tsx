@@ -25,6 +25,8 @@ export function ManualSearchFlow({
   onEdit,
   onRetry,
   onSearch,
+  origin = 'manual',
+  recognitionConfidence,
 }: {
   state: SearchState;
   onBack(): void;
@@ -33,6 +35,8 @@ export function ManualSearchFlow({
   onEdit(): void;
   onRetry(): void;
   onSearch(query: MetadataQuery): void;
+  origin?: 'manual' | 'isbn' | 'cover';
+  recognitionConfidence?: 'high' | 'medium' | 'low';
 }) {
   const [draft, setDraft] = useState({ isbn: '', title: '', author: '' });
 
@@ -71,6 +75,8 @@ export function ManualSearchFlow({
         providerFailures={state.providerFailures}
         onBack={onEdit}
         onConfirm={onConfirm}
+        origin={origin}
+        recognitionConfidence={recognitionConfidence}
       />
     );
   }
@@ -202,11 +208,15 @@ function CandidateScreen({
   providerFailures,
   onBack,
   onConfirm,
+  origin,
+  recognitionConfidence,
 }: {
   candidates: MetadataCandidate[];
   providerFailures: string[];
   onBack(): void;
   onConfirm(candidate: MetadataCandidate): void;
+  origin: 'manual' | 'isbn' | 'cover';
+  recognitionConfidence?: 'high' | 'medium' | 'low';
 }) {
   const scrollView = useRef<ScrollView>(null);
 
@@ -225,12 +235,18 @@ function CandidateScreen({
         contentContainerStyle={styles.content}
         contentOffset={{ x: 0, y: 0 }}
       >
-        <SecondaryButton compact label="Edit search" onPress={onBack} />
+        <SecondaryButton compact label={origin === 'cover' ? 'Scan again' : 'Edit search'} onPress={onBack} />
         <View style={styles.headingGroup}>
           <Text style={styles.title}>Is this the right book?</Text>
-          <Text style={styles.body}>
-            {candidates.length === 1 ? '1 possible match' : `${candidates.length} possible matches`}
-          </Text>
+          <Text style={styles.body}>{origin === 'cover'
+            ? recognitionConfidence === 'high'
+              ? 'Strong cover match—please confirm the work.'
+              : recognitionConfidence === 'medium'
+                ? 'A few cover matches are possible. Choose the right work.'
+                : 'The cover evidence is limited. Please check these possibilities.'
+            : candidates.length === 1
+              ? '1 possible match'
+              : `${candidates.length} possible matches`}</Text>
           {providerFailures.length > 0 ? (
             <Text style={styles.warning}>Some catalogs were unavailable. Results may be limited.</Text>
           ) : null}
@@ -238,7 +254,7 @@ function CandidateScreen({
         {candidates.map((candidate) => (
           <CandidateCard key={candidate.candidateId} candidate={candidate} onPress={() => onConfirm(candidate)} />
         ))}
-        <SecondaryButton label="None of these" onPress={onBack} />
+        <SecondaryButton label={origin === 'cover' ? 'None—scan again' : 'None of these'} onPress={onBack} />
         <Text style={styles.note}>Choose the underlying work. A legal digital edition may be a different publication.</Text>
       </ScrollView>
     </SafeAreaView>

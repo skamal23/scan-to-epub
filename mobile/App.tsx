@@ -8,6 +8,8 @@ import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createBackendClient, type BackendClient } from './src/api/health';
+import type { CoverClient, CoverRecognitionResult } from './src/api/cover';
+import { createExpoCoverClient } from './src/api/coverRuntime';
 import {
   createMetadataClient,
   type MetadataClient,
@@ -28,6 +30,7 @@ import {
 export type AppProps = {
   client?: BackendClient;
   metadataClient?: MetadataClient;
+  coverClient?: CoverClient;
   showScenarioLauncher?: boolean;
 };
 
@@ -48,9 +51,12 @@ const liveMetadataClient = createMetadataClient({
   timeoutMs: 8000,
 });
 
+const liveCoverClient = createExpoCoverClient(environment.apiUrl);
+
 export default function App({
   client = liveClient,
   metadataClient = liveMetadataClient,
+  coverClient = liveCoverClient,
   showScenarioLauncher = __DEV__,
 }: AppProps) {
   const [state, dispatch] = useReducer(appReducer, initialAppState);
@@ -59,6 +65,8 @@ export default function App({
   const lastQuery = useRef<MetadataQuery | null>(null);
   const activeSearch = useRef<AbortController | null>(null);
   const [scannerFixture, setScannerFixture] = useState<ScannerFixture | undefined>();
+  const [identificationOrigin, setIdentificationOrigin] = useState<'manual' | 'isbn' | 'cover'>('manual');
+  const [coverConfidence, setCoverConfidence] = useState<'high' | 'medium' | 'low'>('low');
 
   const checkHealth = useCallback(async () => {
     dispatch({ type: 'healthChecking' });
@@ -125,18 +133,32 @@ export default function App({
   if (state.screen === 'scanner') {
     return (
       <ScannerScreen
+        coverClient={coverClient}
         fixture={scannerFixture}
         onBack={() => {
           setScannerFixture(undefined);
           dispatch({ type: 'showLaunch' });
         }}
+        onCoverRecognized={(result: CoverRecognitionResult) => {
+          setScannerFixture(undefined);
+          setIdentificationOrigin('cover');
+          setCoverConfidence(result.confidence);
+          dispatchSearch({
+            type: 'succeeded',
+            candidates: result.candidates,
+            providerFailures: result.providerFailures,
+          });
+          dispatch({ type: 'showManualSearch' });
+        }}
         onIsbnAccepted={(isbn) => {
           setScannerFixture(undefined);
+          setIdentificationOrigin('isbn');
           dispatch({ type: 'showManualSearch' });
           void search({ isbn });
         }}
         onManualSearch={() => {
           setScannerFixture(undefined);
+          setIdentificationOrigin('manual');
           dispatchSearch({ type: 'reset' });
           dispatch({ type: 'showManualSearch' });
         }}
@@ -151,9 +173,18 @@ export default function App({
         onBack={() => dispatch({ type: 'showScanner' })}
         onCancel={cancelSearch}
         onConfirm={(candidate) => dispatchSearch({ type: 'confirmed', candidate })}
-        onEdit={cancelSearch}
+        onEdit={() => {
+          if (identificationOrigin === 'cover') {
+            cancelSearch();
+            dispatch({ type: 'showScanner' });
+          } else {
+            cancelSearch();
+          }
+        }}
         onRetry={retrySearch}
         onSearch={(query) => void search(query)}
+        origin={identificationOrigin}
+        recognitionConfidence={identificationOrigin === 'cover' ? coverConfidence : undefined}
       />
     );
   }

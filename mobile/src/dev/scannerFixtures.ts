@@ -1,4 +1,5 @@
 import type { ScannerFixture } from '../scanner/ScannerScreen';
+import { metadataScenarios } from './metadataScenarios';
 
 const granted = {
   granted: true,
@@ -39,5 +40,61 @@ export const scannerFixtures = {
       { type: 'ean13', data: '9780141439518', at: 250 },
       { type: 'ean13', data: '9780141439518', at: 500 },
     ],
+  },
+  coverStrong: {
+    permission: granted,
+    coverResult: {
+      status: 'matched',
+      confidence: 'high',
+      extractedTitle: 'Pride and Prejudice',
+      extractedAuthor: 'Jane Austen',
+      candidates: metadataScenarios.one.map((candidate) => ({
+        ...candidate,
+        matchReasons: ['Title match', 'Author match', 'Cover match'],
+      })),
+      providerFailures: [],
+    },
+  },
+  coverAmbiguous: {
+    permission: granted,
+    coverResult: {
+      status: 'ambiguous',
+      confidence: 'medium',
+      extractedTitle: 'Invisible Man',
+      extractedAuthor: null,
+      candidates: metadataScenarios.ambiguous,
+      providerFailures: [],
+    },
+  },
+  coverNoMatch: {
+    permission: granted,
+    coverResult: {
+      status: 'no_match',
+      confidence: 'low',
+      extractedTitle: null,
+      extractedAuthor: null,
+      candidates: [],
+      providerFailures: [],
+    },
+  },
+  coverTimeout: {
+    permission: granted,
+    coverError: 'Cover recognition timed out',
+  },
+  coverOffline: {
+    permission: granted,
+    coverError: 'Could not reach cover recognition',
+  },
+  coverProcessing: {
+    permission: granted,
+    coverDelayMs: 5000,
+    coverResult: {
+      status: 'matched',
+      confidence: 'high',
+      extractedTitle: 'Pride and Prejudice',
+      extractedAuthor: 'Jane Austen',
+      candidates: metadataScenarios.one,
+      providerFailures: [],
+    },
   },
 } satisfies Record<string, ScannerFixture>;

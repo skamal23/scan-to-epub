@@ -1,8 +1,21 @@
-import { act, fireEvent, render } from '@testing-library/react-native';
+import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 
+jest.mock('expo-camera', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    CameraView: (props: object) => React.createElement(View, props),
+    useCameraPermissions: () => [
+      { granted: true, status: 'granted', canAskAgain: true },
+      jest.fn(),
+    ],
+  };
+});
+
 import {
+  ScannerScreen,
   ScannerView,
   type CameraPermissionState,
 } from '../ScannerScreen';
@@ -16,6 +29,7 @@ const granted: CameraPermissionState = {
 const baseProps = {
   onBack: jest.fn(),
   onIsbnAccepted: jest.fn(),
+  onCaptureCover: jest.fn(),
   onManualSearch: jest.fn(),
   onOpenSettings: jest.fn(),
   onRequestPermission: jest.fn(),
@@ -42,7 +56,7 @@ describe('<ScannerView />', () => {
       />,
     );
 
-    expect(view.getByText('Scan ISBN barcodes')).toBeTruthy();
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Allow camera' }));
     expect(baseProps.onRequestPermission).toHaveBeenCalledTimes(1);
   });
@@ -68,8 +82,7 @@ describe('<ScannerView />', () => {
     expect(baseProps.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
-  test('freezes and accepts a stable repeated ISBN observation', () => {
-    jest.useFakeTimers();
+  test('freezes and accepts a stable repeated ISBN observation', async () => {
     const accepted = jest.fn();
     const feedback = jest.fn().mockResolvedValue(undefined);
     const view = render(
@@ -77,7 +90,7 @@ describe('<ScannerView />', () => {
         {...baseProps}
         permission={granted}
         feedback={feedback}
-        captureDelayMs={250}
+        captureDelayMs={0}
         onIsbnAccepted={accepted}
         scriptedObservations={[
           { type: 'ean13', data: '9780141439518', at: 0 },
@@ -89,20 +102,17 @@ describe('<ScannerView />', () => {
 
     expect(view.getByText('ISBN captured.')).toBeTruthy();
     expect(feedback).toHaveBeenCalledTimes(1);
-    act(() => jest.advanceTimersByTime(250));
-    expect(accepted).toHaveBeenCalledWith('9780141439518');
-    jest.useRealTimers();
+    await waitFor(() => expect(accepted).toHaveBeenCalledWith('9780141439518'));
   });
 
-  test('manual shutter accepts the latest single valid observation', () => {
-    jest.useFakeTimers();
+  test('manual shutter accepts the latest single valid observation', async () => {
     const accepted = jest.fn();
     const view = render(
       <ScannerView
         {...baseProps}
         permission={granted}
         feedback={jest.fn().mockResolvedValue(undefined)}
-        captureDelayMs={1}
+        captureDelayMs={0}
         now={() => 500}
         onIsbnAccepted={accepted}
         scriptedObservations={[
@@ -111,14 +121,29 @@ describe('<ScannerView />', () => {
       />,
     );
 
-    fireEvent.press(view.getByRole('button', { name: 'Capture detected ISBN' }));
-    act(() => jest.advanceTimersByTime(1));
-    expect(accepted).toHaveBeenCalledWith('9780141439518');
-    jest.useRealTimers();
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    await waitFor(() => expect(accepted).toHaveBeenCalledWith('9780141439518'));
   });
 
-  test('does not replay default success feedback after a parent rerender', () => {
-    jest.useFakeTimers();
+  test('manual shutter captures a cover when no fresh ISBN is visible', () => {
+    const captureCover = jest.fn();
+    const view = render(
+      <ScannerView
+        {...baseProps}
+        permission={granted}
+        onCaptureCover={captureCover}
+      />,
+    );
+
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByText('Cover photos are processed temporarily and not saved.')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+
+    expect(captureCover).toHaveBeenCalledTimes(1);
+    expect(baseProps.onIsbnAccepted).not.toHaveBeenCalled();
+  });
+
+  test('does not replay default success feedback after a parent rerender', async () => {
     const haptic = jest.spyOn(Haptics, 'notificationAsync').mockResolvedValue(undefined);
     const observations = [
       { type: 'ean13', data: '9780141439518', at: 0 },
@@ -129,23 +154,89 @@ describe('<ScannerView />', () => {
       <ScannerView
         {...baseProps}
         permission={granted}
-        captureDelayMs={5000}
+        captureDelayMs={0}
         onIsbnAccepted={jest.fn()}
         scriptedObservations={observations}
       />,
     );
-    expect(haptic).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(haptic).toHaveBeenCalledTimes(1));
 
     view.rerender(
       <ScannerView
         {...baseProps}
         permission={granted}
-        captureDelayMs={5000}
+        captureDelayMs={0}
         scriptedObservations={observations}
       />,
     );
     expect(haptic).toHaveBeenCalledTimes(1);
+    view.unmount();
     haptic.mockRestore();
-    jest.useRealTimers();
+  });
+
+  test('offers barcode and manual recovery after an uncertain cover', async () => {
+    const manualSearch = jest.fn();
+    const view = render(
+      <ScannerScreen
+        fixture={{
+          permission: granted,
+          coverResult: {
+            status: 'no_match',
+            confidence: 'low',
+            extractedTitle: null,
+            extractedAuthor: null,
+            candidates: [],
+            providerFailures: [],
+          },
+        }}
+        onBack={jest.fn()}
+        onCoverRecognized={jest.fn()}
+        onIsbnAccepted={jest.fn()}
+        onManualSearch={manualSearch}
+      />,
+    );
+
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    await waitFor(() => expect(view.getByText('Couldn’t identify this cover')).toBeTruthy());
+    expect(view.getByRole('button', { name: 'Try another cover' })).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Scan the back barcode' }));
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    await waitFor(() => expect(view.getByText('Couldn’t identify this cover')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Enter title manually' }));
+    expect(manualSearch).toHaveBeenCalledTimes(1);
+  });
+
+  test('cancels cover processing without allowing a late fixture result to navigate', async () => {
+    const recognized = jest.fn();
+    const view = render(
+      <ScannerScreen
+        fixture={{
+          permission: granted,
+          coverDelayMs: 50,
+          coverResult: {
+            status: 'matched',
+            confidence: 'high',
+            extractedTitle: 'Pride and Prejudice',
+            extractedAuthor: 'Jane Austen',
+            candidates: [],
+            providerFailures: [],
+          },
+        }}
+        onBack={jest.fn()}
+        onCoverRecognized={recognized}
+        onIsbnAccepted={jest.fn()}
+        onManualSearch={jest.fn()}
+      />,
+    );
+
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    expect(view.getByText('Reading the cover…')).toBeTruthy();
+    fireEvent.press(view.getByRole('button', { name: 'Cancel' }));
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    await new Promise((resolve) => setTimeout(resolve, 75));
+    expect(recognized).not.toHaveBeenCalled();
+    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
   });
 });

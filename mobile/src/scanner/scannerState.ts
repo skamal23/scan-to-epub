@@ -1,7 +1,7 @@
 import { normalizeScannedISBN } from './isbnScanner';
 
 const REQUIRED_STABLE_OBSERVATIONS = 3;
-const STABILITY_WINDOW_MS = 1200;
+export const STABILITY_WINDOW_MS = 1200;
 
 export type ScannerState = {
   stableCount: number;
@@ -27,8 +27,16 @@ export const initialScannerState: ScannerState = {
   lastObservedAt: null,
   locked: false,
   accepted: null,
-  message: 'Align the ISBN barcode inside the frame.',
+  message: 'Frame the front cover, or show the back barcode.',
 };
+
+export function hasFreshISBN(state: ScannerState, at: number): boolean {
+  return Boolean(
+    state.lastValidIsbn
+    && state.lastObservedAt !== null
+    && at - state.lastObservedAt <= STABILITY_WINDOW_MS,
+  );
+}
 
 export function scannerReducer(state: ScannerState, action: ScannerAction): ScannerState {
   if (action.type === 'reset') {

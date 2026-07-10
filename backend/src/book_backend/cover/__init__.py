@@ -1,0 +1,1 @@
+"""Ephemeral front-cover recognition."""

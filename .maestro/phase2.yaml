@@ -9,7 +9,7 @@ name: Phase 2 ISBN scanner states
       text: Camera permission prompt
     direction: DOWN
 - tapOn: Camera permission prompt
-- assertVisible: Scan ISBN barcodes
+- assertVisible: Scan a cover or ISBN
 - assertVisible: Allow camera
 - assertVisible: Search manually
 - tapOn: Back
@@ -30,7 +30,7 @@ name: Phase 2 ISBN scanner states
     direction: DOWN
 - tapOn: Invalid ISBN
 - assertVisible: That barcode is not a valid ISBN.
-- assertVisible: ISBN scan guide
+- assertVisible: Book scan guide
 - takeScreenshot: .maestro/artifacts/phase2-invalid
 - tapOn: Back
 - tapOn: Test scenarios
@@ -48,7 +48,7 @@ name: Phase 2 ISBN scanner states
     direction: DOWN
 - tapOn: Single ISBN
 - assertVisible: ISBN found. Hold steady…
-- tapOn: Capture detected ISBN
+- tapOn: Capture cover or detected ISBN
 - assertVisible: Is this the right book?
 - tapOn: Edit search
 - tapOn: Back

@@ -72,6 +72,33 @@ export function ScenarioLauncher({
             onPress={() => onScannerFixture(scannerFixtures.repeatedValid)}
           />
         </View>
+        <Text style={styles.sectionLabel}>COVER RECOGNITION</Text>
+        <View style={styles.buttonStack}>
+          <SecondaryButton
+            label="Cover: strong match"
+            onPress={() => onScannerFixture(scannerFixtures.coverStrong)}
+          />
+          <SecondaryButton
+            label="Cover: ambiguous"
+            onPress={() => onScannerFixture(scannerFixtures.coverAmbiguous)}
+          />
+          <SecondaryButton
+            label="Cover: no match"
+            onPress={() => onScannerFixture(scannerFixtures.coverNoMatch)}
+          />
+          <SecondaryButton
+            label="Cover: timeout"
+            onPress={() => onScannerFixture(scannerFixtures.coverTimeout)}
+          />
+          <SecondaryButton
+            label="Cover: offline"
+            onPress={() => onScannerFixture(scannerFixtures.coverOffline)}
+          />
+          <SecondaryButton
+            label="Cover: processing"
+            onPress={() => onScannerFixture(scannerFixtures.coverProcessing)}
+          />
+        </View>
         <Text style={styles.sectionLabel}>BOOK SEARCH</Text>
         <View style={styles.buttonStack}>
           <SecondaryButton label="One book" onPress={() => onCandidates(metadataScenarios.one)} />
