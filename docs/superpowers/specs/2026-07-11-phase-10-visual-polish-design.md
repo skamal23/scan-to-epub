@@ -7,6 +7,7 @@ Use the approved hybrid direction: a cinematic, dark scanner that feels purpose-
 ## Goals
 
 - Make the primary demo path feel intentional from scan to Apple Books handoff.
+- Make the default path understandable as scan → confirm → open without instructional paragraphs or technical vocabulary.
 - Give every existing state a coherent hierarchy: action first, explanation second, technical provenance last.
 - Preserve the existing plain-language rights and edition-difference messages.
 - Keep all interactive controls, accessibility semantics, fixture behavior, and network contracts unchanged.
@@ -18,6 +19,7 @@ Use the approved hybrid direction: a cinematic, dark scanner that feels purpose-
 - No remote font loading, generated artwork, heavy UI kit, or development-build-only dependency.
 - No decorative animation around repeated actions, download percentages, or error states.
 - No visual treatment that suggests physical ownership grants digital rights.
+- No native reader in this phase. If an authorized structured-text or safe-PDF source exists, prepare the EPUB automatically; if no authorized source exists, there is nothing the app may present as readable text.
 
 ## Visual system
 
@@ -62,21 +64,31 @@ Adopt a four-point rhythm with 24 pt screen gutters on standard phones. The prim
 
 ### Launch
 
-The launch screen remains sparse: a small trust-oriented eyebrow, a confident title, one short promise, a compact connection indicator, and the scanner action anchored near the lower half. Development scenarios remain visually secondary and remain absent from production builds.
+The launch screen remains sparse: the product name, one short prompt, a compact connection indicator, and the scanner action anchored near the lower half. It does not lead with rights/legal language. Development scenarios remain visually secondary and remain absent from production builds.
 
 ### Scanner
 
-The scanner is the cinematic moment. It uses the real camera or dark fixture preview under a restrained vertical scrim. The scan guide becomes a single strong rectangular frame with subtle corner emphasis. The header has a compact back control, title, and one-line barcode guidance. The shutter remains familiar and central; manual search and the privacy statement stay visible below it. Nothing decorative competes with the book image.
+The scanner is the cinematic moment. It uses the real camera or dark fixture preview under a restrained vertical scrim. The scan guide becomes a single strong rectangular frame with subtle corner emphasis. The header has a compact back control, a direct title, and one short barcode hint. The shutter remains familiar and central; manual search is the only secondary action. Privacy handling stays in the product’s privacy/legal information, not as a paragraph competing with the camera. Nothing decorative competes with the book image.
 
 ### Search and confirmation
 
-Manual search uses one clear form surface. Candidate cards use the cover as the visual anchor, align metadata to a stable vertical rhythm, and make the match rationale supportive rather than dominant. The confirmation screen uses the same editorial title and one physical-edition card, avoiding duplicate headings and excessive borders.
+Manual search uses one clear form surface. Candidate cards use the cover as the visual anchor, align metadata to a stable vertical rhythm, and make the match rationale supportive rather than dominant. The confirmation prompt is simply “Is this your book?” with one card or a small choice set, an obvious reject/scan-again action, and no catalog explanation unless recovery is needed.
 
 ### Edition result and provenance
 
-The ready screen makes the digital book cover and title the hero. The verified/generated label is compact; the edition-difference explanation follows immediately. The primary handoff action is visually unambiguous, with Files as the secondary action. Provenance remains available in a collapsible details card, but the common path does not require reading it.
+The ready screen makes the digital book cover and title the hero. Its default title is a simple outcome such as “Ready to read”; it does not distinguish verified, generated, or converted paths in the main presentation. The primary handoff action is visually unambiguous, with Files as the secondary action. Provenance, source, license, edition differences, and transformation evidence remain available under a neutral collapsed “Details” control, but the common path does not require reading any of it. Authorized structured text and safe PDF sources follow the same ready-to-open path after automatic EPUB preparation.
 
-Unavailable, source-error, permission, and cover-recovery states follow the same centered composition as the result screen: direct headline, concise reason, one clear recovery action, then a secondary escape route. Error color supplements copy and icons; it never carries meaning alone.
+Unavailable, source-error, permission, and cover-recovery states follow the same centered composition as the result screen: direct headline, concise reason, one clear recovery action, then a secondary escape route. “No open edition available” is sufficient default wording; detailed legal/source explanation belongs in Details or help, not the refusal screen. Error color supplements copy and icons; it never carries meaning alone.
+
+### Information hierarchy
+
+The normal user-facing path has only the information needed to act:
+
+1. **Scan:** Camera, a short scanner hint, shutter, and manual search.
+2. **Confirm:** “Is this your book?” and one or a few cover-led choices.
+3. **Open:** The digital book, “Ready to read,” and Open in Books.
+
+Source validation, territory, license, hashes, EPUBCheck, transformation steps, and physical/digital edition distinctions are essential product evidence but not primary interaction copy. They remain accurate and available through Details; they are never deleted or misleadingly summarized.
 
 ## Motion and feedback
 
@@ -110,4 +122,4 @@ Do not add looping pulses, long spinners, parallax, confetti, bounce on ordinary
 
 ## Acceptance criteria
 
-Phase 10 is complete when the existing functional flows look like one product, each critical state is legible without reading provenance, motion improves comprehension without causing delay, and all existing accessibility and deterministic behavior remain intact. The result must still be runnable in Expo Go on the user’s iPhone.
+Phase 10 is complete when the existing functional flows look like one product, the default path needs no technical/legal reading to complete scan → confirm → open, each critical state is legible without opening Details, motion improves comprehension without causing delay, and all existing accessibility and deterministic behavior remain intact. The result must still be runnable in Expo Go on the user’s iPhone.

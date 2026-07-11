@@ -12,7 +12,9 @@
 
 - Do not change routes, reducers, API payloads, legal allowlists, provenance, delivery, or share-sheet behavior.
 - Do not add a UI kit, remote font dependency, native development build requirement, generated artwork, or a custom reader.
-- Keep iOS system typography and all user-visible functional copy stable unless a deterministic test is intentionally updated with it.
+- Keep the default path to scan → confirm → open minimal: user-facing copy must explain the next action or outcome, not legal/process internals. Intentionally update deterministic tests when simplifying a visible label.
+- Keep source, license, territory, validation, hash, transformation, and edition-difference evidence accurate and available only through a neutral collapsed Details control; do not show it by default on ready/refusal screens.
+- Do not add a native reader in this phase. Authorized structured text and safe PDFs are automatically prepared as EPUBs; no authorized source means a concise unavailable state rather than readable text.
 - Use only `opacity` and `transform` for new motion; no looping decorative animation or motion on per-tick download progress.
 - Respect the current and changing `AccessibilityInfo` Reduce Motion setting. Motion must never block input.
 - Keep VoiceOver alerts/live regions, test scenario labels, 44 pt targets, keyboard behavior, and Expo Go compatibility intact.
@@ -168,7 +170,7 @@ git commit -m "feat: polish launch and scanner experience"
 **Interfaces:**
 
 - Consumes: the existing `SearchState`, `MetadataCandidate`, navigation callbacks, and Task 1 UI foundation.
-- Produces: unchanged search/confirmation actions with a tokenized form, cover-led candidate card, and visually quiet match metadata.
+- Produces: unchanged search/confirmation actions with a tokenized form, cover-led candidate card, visually quiet match metadata, and a minimal “Is this your book?” confirmation prompt.
 
 - [ ] **Step 1: Add focused search visual/interaction tests**
 
@@ -182,7 +184,7 @@ Expected: the new card/typography contract fails only where the current componen
 
 - [ ] **Step 3: Apply the editorial search treatment**
 
-Replace local palette literals with theme tokens, use `Entrance` for the form/candidate result content, increase title/cover hierarchy, use quiet surface borders, and make match-reason text a small evergreen supporting line. Preserve every form label, `testID`, `accessibilityLabel`, keyboard behavior, candidate button, provider warning, and long-title wrapping.
+Replace local palette literals with theme tokens, use `Entrance` for the form/candidate result content, increase title/cover hierarchy, use quiet surface borders, and make match-reason text a small evergreen supporting line. Simplify the default confirmation copy to “Is this your book?” and remove catalog/process explanation from the default candidate screen; preserve recovery warnings when a provider is unavailable. Preserve every form label, `testID`, `accessibilityLabel`, keyboard behavior, candidate button, provider warning, and long-title wrapping.
 
 - [ ] **Step 4: Exercise the deterministic UI flows**
 
@@ -212,11 +214,11 @@ git commit -m "feat: polish book search and confirmation"
 **Interfaces:**
 
 - Consumes: `EditionState`, `ExportState`, rights/provenance data, export callbacks, and Task 1 UI primitives.
-- Produces: unchanged ready, generated, unavailable, source-error, download, share, and provenance behavior with an editorial result hierarchy and a readable recovery composition.
+- Produces: unchanged ready, generated, unavailable, source-error, download, share, and provenance behavior with an editorial result hierarchy, a minimal ready-to-open main path, a neutral Details disclosure, and a readable recovery composition.
 
 - [ ] **Step 1: Add failure-first UI contract tests**
 
-Add tests asserting that the ready screen keeps the digital title as the polite live region, maintains the primary Books and secondary Files action order, retains the alert role for unavailable/export errors, and keeps the provenance toggle as an individually reachable button. Add style-level checks that the details card has `backgroundColor: colors.surface`, `borderColor: colors.line`, and `borderRadius: radius.card`; the missing border contract fails before the screen is polished.
+Add tests asserting that the ready screen keeps the digital title as the polite live region, uses a concise ready outcome, maintains the primary Books and secondary Files action order, retains the alert role for unavailable/export errors, and keeps the neutral Details toggle as an individually reachable button. Assert that source/license/transformation copy is absent until Details opens. Add style-level checks that the details card has `backgroundColor: colors.surface`, `borderColor: colors.line`, and `borderRadius: radius.card`; the missing border contract fails before the screen is polished.
 
 - [ ] **Step 2: Run the focused tests to verify the new contracts fail**
 
@@ -226,7 +228,7 @@ Expected: new token/structure assertions fail before the edition screen consumes
 
 - [ ] **Step 3: Apply the result and recovery design**
 
-Use `Entrance` for the ready card and centered recovery content. Make the cover/title card the hero, keep the edition-difference explanation immediately below it, make the primary export action singular, and put provenance inside a quiet surfaced details card. Apply the same centered hierarchy to unavailable, source-error, incomplete-result, download, sharing, and export-error states. Do not animate share-sheet state, download percentage, or the disclosure toggle.
+Use `Entrance` for the ready card and centered recovery content. Make the cover/title card the hero, use a concise ready outcome, make the primary export action singular, and put provenance, license, validation, transformation, and edition-difference evidence inside a quiet surfaced Details card. Apply the same minimal centered hierarchy to unavailable, source-error, incomplete-result, download, sharing, and export-error states. Do not add a native reader or ask the user to choose a conversion path: authorized structured text/PDF already resolves to the same EPUB export result. Do not animate share-sheet state, download percentage, or the disclosure toggle.
 
 - [ ] **Step 4: Run focused and end-to-end validation**
 
@@ -289,7 +291,7 @@ make maestro-visual
 git diff --check
 ```
 
-Use Computer Use when the Mac is unlocked to inspect the launch, scanner, candidate, ready, long-title, unavailable, and native-share-sheet states at default Dynamic Type. Repeat at a large Dynamic Type setting and with Reduce Motion enabled; record any iOS-system-owned limitation in the plan.
+Use Computer Use when the Mac is unlocked to inspect the launch, scanner, candidate, ready, long-title, unavailable, Details, and native-share-sheet states at default Dynamic Type. Confirm that the default scan → confirm → open path has no unnecessary legal/process copy. Repeat at a large Dynamic Type setting and with Reduce Motion enabled; record any iOS-system-owned limitation in the plan.
 
 - [ ] **Step 5: Request an adversarial review and address findings**
 
