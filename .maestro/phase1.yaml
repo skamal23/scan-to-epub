@@ -3,9 +3,7 @@ name: Phase 1 manual identification flow
 ---
 - launchApp
 - tapOn: Book to EPUB
-- assertVisible: Book to EPUB
-- assertVisible: Backend connected
-- tapOn: Open scanner
+- assertVisible: Search manually
 - tapOn: Search manually
 - assertVisible: Find your book
 - tapOn:

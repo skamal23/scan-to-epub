@@ -3,9 +3,10 @@ name: Phase 10 launch and scanner visuals
 ---
 - launchApp
 - tapOn: Book to EPUB
+- assertVisible: Search manually
+- tapOn: Back
 - assertVisible: Book to EPUB
 - assertVisible: Scan a book to get started.
-- assertNotVisible: Backend connected
 - takeScreenshot: .maestro/artifacts/phase10-launch
 - tapOn: Test scenarios
 - scrollUntilVisible:

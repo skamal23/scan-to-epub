@@ -3,9 +3,6 @@ name: Phase 0 foundation flow
 ---
 - launchApp
 - tapOn: Book to EPUB
-- assertVisible: Book to EPUB
-- assertVisible: Backend connected
-- tapOn: Open scanner
 - assertVisible: Search manually
 - takeScreenshot: .maestro/artifacts/phase0-scanner
 - tapOn: Back
@@ -16,13 +13,13 @@ name: Phase 0 foundation flow
 - assertVisible: Backend unavailable
 - assertVisible: Retry connection
 - tapOn: Retry connection
-- assertVisible: Backend connected
+- assertVisible: Book to EPUB
 - tapOn: Test scenarios
 - tapOn: Timeout
 - assertVisible: Connection timed out
 - tapOn: Retry connection
-- assertVisible: Backend connected
+- assertVisible: Book to EPUB
 - tapOn: Test scenarios
 - tapOn: Loading
-- assertVisible: Checking backend…
+- assertVisible: Book to EPUB
 - takeScreenshot: .maestro/artifacts/phase0-loading

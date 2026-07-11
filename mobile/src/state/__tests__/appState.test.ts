@@ -1,22 +1,26 @@
 import { appReducer, initialAppState } from '../appState';
 
 describe('app state', () => {
-  test('moves from checking to a connected launch screen', () => {
-    expect(appReducer(initialAppState, { type: 'healthSucceeded' })).toEqual({
-      screen: 'launch',
+  test('starts on the scanner', () => {
+    expect(initialAppState.screen).toBe('scanner');
+  });
+
+  test('records a healthy backend without replacing the active screen', () => {
+    expect(appReducer({ ...initialAppState, screen: 'edition' }, { type: 'healthSucceeded' })).toEqual({
+      screen: 'edition',
       connectivity: 'online',
       message: 'Backend connected',
     });
   });
 
-  test('preserves a useful failure message', () => {
+  test('preserves a useful failure message without replacing the active screen', () => {
     expect(
-      appReducer(initialAppState, {
+      appReducer({ ...initialAppState, screen: 'manualSearch' }, {
         type: 'healthFailed',
         message: 'Connection timed out',
       }),
     ).toEqual({
-      screen: 'launch',
+      screen: 'manualSearch',
       connectivity: 'offline',
       message: 'Connection timed out',
     });

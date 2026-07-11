@@ -3,8 +3,9 @@ name: Phase 2 ISBN scanner states
 ---
 - launchApp
 - tapOn: Book to EPUB
+- assertVisible: Search manually
+- tapOn: Back
 - assertVisible: Book to EPUB
-- assertVisible: Backend connected
 - tapOn: Test scenarios
 - scrollUntilVisible:
     element:

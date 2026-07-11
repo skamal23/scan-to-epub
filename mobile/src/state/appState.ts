@@ -15,7 +15,7 @@ export type AppAction =
   | { type: 'showLaunch' };
 
 export const initialAppState: AppState = {
-  screen: 'launch',
+  screen: 'scanner',
   connectivity: 'checking',
   message: 'Checking backend…',
 };
@@ -30,13 +30,13 @@ export function appReducer(state: AppState, action: AppAction): AppState {
       };
     case 'healthSucceeded':
       return {
-        screen: 'launch',
+        ...state,
         connectivity: 'online',
         message: 'Backend connected',
       };
     case 'healthFailed':
       return {
-        screen: 'launch',
+        ...state,
         connectivity: 'offline',
         message: action.message,
       };

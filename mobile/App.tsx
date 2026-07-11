@@ -117,23 +117,31 @@ export default function App({
   const activeSearch = useRef<AbortController | null>(null);
   const activeEdition = useRef<AbortController | null>(null);
   const activeDownload = useRef<EpubDownloadTask | null>(null);
+  const healthRequestGeneration = useRef(0);
   const selectedCandidate = useRef<import('./src/api/metadata').MetadataCandidate | null>(null);
   const [scannerFixture, setScannerFixture] = useState<ScannerFixture | undefined>();
   const [identificationOrigin, setIdentificationOrigin] = useState<'manual' | 'isbn' | 'cover'>('manual');
   const [coverConfidence, setCoverConfidence] = useState<'high' | 'medium' | 'low'>('low');
 
   const checkHealth = useCallback(async () => {
+    const requestGeneration = ++healthRequestGeneration.current;
     dispatch({ type: 'healthChecking' });
     try {
       await client.checkHealth();
+      if (requestGeneration !== healthRequestGeneration.current) return;
       dispatch({ type: 'healthSucceeded' });
     } catch (error) {
+      if (requestGeneration !== healthRequestGeneration.current) return;
       dispatch({
         type: 'healthFailed',
         message: error instanceof Error ? error.message : 'Backend unavailable',
       });
     }
   }, [client]);
+
+  const invalidateHealthRequest = useCallback(() => {
+    healthRequestGeneration.current += 1;
+  }, []);
 
   const search = useCallback(async (query: MetadataQuery) => {
     lastQuery.current = query;
@@ -379,12 +387,20 @@ export default function App({
           dispatchSearch({ type: 'succeeded', candidates, providerFailures });
           dispatch({ type: 'showManualSearch' });
         }}
-        onConnected={() => dispatch({ type: 'healthSucceeded' })}
+        onConnected={() => {
+          invalidateHealthRequest();
+          dispatch({ type: 'healthSucceeded' });
+        }}
         onLoading={() => {
+          invalidateHealthRequest();
           dispatch({ type: 'healthChecking' });
           dispatch({ type: 'showLaunch' });
         }}
-        onOffline={() => dispatch({ type: 'healthFailed', message: 'Backend unavailable' })}
+        onOffline={() => {
+          invalidateHealthRequest();
+          dispatch({ type: 'healthFailed', message: 'Backend unavailable' });
+          dispatch({ type: 'showLaunch' });
+        }}
         onSearchError={(retryQuery) => {
           lastQuery.current = retryQuery;
           dispatchSearch({ type: 'failed', message: 'Book search is temporarily unavailable' });
@@ -394,7 +410,11 @@ export default function App({
           setScannerFixture(fixture);
           dispatch({ type: 'showScanner' });
         }}
-        onTimeout={() => dispatch({ type: 'healthFailed', message: 'Connection timed out' })}
+        onTimeout={() => {
+          invalidateHealthRequest();
+          dispatch({ type: 'healthFailed', message: 'Connection timed out' });
+          dispatch({ type: 'showLaunch' });
+        }}
         onEditionResult={(candidate, result) => {
           selectedCandidate.current = candidate;
           dispatchSearch({ type: 'confirmed', candidate });
