@@ -9,11 +9,13 @@ from book_backend.app import create_app
 from book_backend.config import Settings
 from book_backend.editions.errors import SourceUnavailable, ValidationFailed
 from book_backend.editions.fixtures import fixture_epub_bytes
-from book_backend.editions.models import EditionResolutionResult
+from book_backend.editions.models import EditionResolutionResult, EditionResolveRequest
+from book_backend.epubs.artifacts import EphemeralEpubStore
 from book_backend.epubs.generation import StructuredSource
 from book_backend.epubs.generation import generate_epub as real_generate_epub
 from book_backend.epubs.safety import inspect_epub
 from book_backend.epubs.validator import EpubcheckValidator
+from book_backend.rights.policy import RightsDecision
 
 
 class StubEditionService:
@@ -210,12 +212,121 @@ async def test_fixture_mode_analyzes_a_test_only_pdf_and_delivers_a_generated_ep
         )
 
     payload = resolved.json()
-    assert payload["provenance"]["generatorVersion"] == "guarded-pdf/1 + structured-epub/1"
+    assert payload["provenance"]["generatorVersion"] == "guarded-pdf/3 + structured-epub/1"
     assert "accounted for 3 PDF body blocks" in payload["provenance"]["transformationSteps"]
+    assert "removed running_header (p1-l1)" in payload["provenance"]["transformationSteps"]
+    assert "removed page_number (p2-l3)" in payload["provenance"]["transformationSteps"]
     with zipfile.ZipFile(io.BytesIO(downloaded.content)) as archive:
         chapter = archive.read("EPUB/chapter-001.xhtml").decode()
     assert "This test-only PDF source has a reliable text layer." in chapter
     assert "Test-only PDF header" not in chapter
+
+
+@pytest.mark.anyio
+async def test_pdf_fixture_applies_rights_before_analyzing_content(monkeypatch):
+    def analysis_must_not_run(*_args, **_kwargs):
+        raise AssertionError("rights-denied fixture must not enter PDF analysis")
+
+    monkeypatch.setattr(fixture_module, "analyze_pdf", analysis_must_not_run)
+    monkeypatch.setattr(
+        fixture_module,
+        "decide_rights",
+        lambda *_args, **_kwargs: RightsDecision("reject"),
+        raising=False,
+    )
+    service = fixture_module.FixtureEditionResolutionService(EphemeralEpubStore())
+    request = EditionResolveRequest.model_validate(
+        generated_fixture_request_body(
+            candidate_id="fixture:generated-pdf",
+            title="Authorized PDF Source",
+        )
+    )
+
+    result = await service.resolve(request)
+
+    assert result.status == "unavailable"
+    assert result.reason == "The available source did not pass the demo's rights policy."
+
+
+@pytest.mark.anyio
+async def test_pdf_fixture_requires_its_pinned_hash_before_analyzing_content(monkeypatch):
+    def analysis_must_not_run(*_args, **_kwargs):
+        raise AssertionError("hash-mismatched fixture must not enter PDF analysis")
+
+    monkeypatch.setitem(fixture_module._PDF_FIXTURES, "fixture:generated-pdf", b"not a PDF")
+    monkeypatch.setattr(fixture_module, "analyze_pdf", analysis_must_not_run)
+    service = fixture_module.FixtureEditionResolutionService(EphemeralEpubStore())
+    request = EditionResolveRequest.model_validate(
+        generated_fixture_request_body(
+            candidate_id="fixture:generated-pdf",
+            title="Authorized PDF Source",
+        )
+    )
+
+    with pytest.raises(ValidationFailed, match="pinned hash"):
+        await service.resolve(request)
+
+
+@pytest.mark.anyio
+async def test_pdf_refusal_fixture_applies_rights_before_analyzing_content(monkeypatch):
+    def analysis_must_not_run(*_args, **_kwargs):
+        raise AssertionError("rights-denied refusal fixture must not enter PDF analysis")
+
+    monkeypatch.setattr(fixture_module, "analyze_pdf", analysis_must_not_run)
+    monkeypatch.setattr(
+        fixture_module,
+        "decide_rights",
+        lambda *_args, **_kwargs: RightsDecision("reject"),
+        raising=False,
+    )
+    service = fixture_module.FixtureEditionResolutionService(EphemeralEpubStore())
+    request = EditionResolveRequest.model_validate(
+        generated_fixture_request_body(
+            candidate_id="fixture:pdf-refused",
+            title="PDF Conversion Refusal",
+        )
+    )
+
+    result = await service.resolve(request)
+
+    assert result.status == "unavailable"
+    assert result.reason == "The available source did not pass the demo's rights policy."
+
+
+@pytest.mark.anyio
+async def test_pdf_refusal_fixture_requires_its_pinned_hash_before_analyzing_content(
+    monkeypatch,
+):
+    def analysis_must_not_run(*_args, **_kwargs):
+        raise AssertionError("hash-mismatched refusal fixture must not enter PDF analysis")
+
+    monkeypatch.setitem(fixture_module._PDF_REFUSAL_FIXTURES, "fixture:pdf-refused", b"not a PDF")
+    monkeypatch.setattr(fixture_module, "analyze_pdf", analysis_must_not_run)
+    service = fixture_module.FixtureEditionResolutionService(EphemeralEpubStore())
+    request = EditionResolveRequest.model_validate(
+        generated_fixture_request_body(
+            candidate_id="fixture:pdf-refused",
+            title="PDF Conversion Refusal",
+        )
+    )
+
+    with pytest.raises(ValidationFailed, match="pinned hash"):
+        await service.resolve(request)
+
+
+@pytest.mark.anyio
+async def test_pdf_fixture_requires_its_reviewed_layout_profile_before_generation(monkeypatch):
+    monkeypatch.setattr(fixture_module, "_PDF_FIXTURE_ANALYSIS_SHA256", "0" * 64)
+    service = fixture_module.FixtureEditionResolutionService(EphemeralEpubStore())
+    request = EditionResolveRequest.model_validate(
+        generated_fixture_request_body(
+            candidate_id="fixture:generated-pdf",
+            title="Authorized PDF Source",
+        )
+    )
+
+    with pytest.raises(ValidationFailed, match="layout profile"):
+        await service.resolve(request)
 
 
 @pytest.mark.anyio

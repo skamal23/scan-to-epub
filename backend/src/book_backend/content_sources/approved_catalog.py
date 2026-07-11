@@ -98,6 +98,7 @@ class ApprovedPdfEntry:
     cover_url: str | None
     content: bytes
     expected_pdf_sha256: str
+    expected_analysis_sha256: str
     snapshot_retrieved_at: datetime
     rights_evidence: RightsEvidence
     license_name: str

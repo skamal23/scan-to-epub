@@ -8,6 +8,7 @@ import pytest
 from test_epub_safety import epub_bytes
 from test_pdf_analysis import _single_column_pdf, _two_column_pdf
 
+import book_backend.editions.service as service_module
 from book_backend.content_sources.approved_catalog import (
     ApprovedEpubCatalog,
     ApprovedPdfCatalog,
@@ -26,6 +27,7 @@ from book_backend.editions.service import (
 )
 from book_backend.epubs.artifacts import EphemeralEpubStore
 from book_backend.epubs.validator import EpubcheckResult
+from book_backend.pdfs.analysis import PdfRejected, analysis_profile_sha256, analyze_pdf
 
 
 class StubAcquirer:
@@ -158,6 +160,12 @@ def structured_entry(content: bytes) -> ApprovedStructuredEntry:
 
 
 def pdf_entry(content: bytes) -> ApprovedPdfEntry:
+    try:
+        expected_analysis_sha256 = analysis_profile_sha256(
+            analyze_pdf(content, title="Authorized PDF Source")
+        )
+    except PdfRejected:
+        expected_analysis_sha256 = "0" * 64
     return ApprovedPdfEntry(
         entry_id="pdf:authorized-source",
         source_key="reviewed_pdf_source",
@@ -175,6 +183,7 @@ def pdf_entry(content: bytes) -> ApprovedPdfEntry:
         cover_url=None,
         content=content,
         expected_pdf_sha256=hashlib.sha256(content).hexdigest(),
+        expected_analysis_sha256=expected_analysis_sha256,
         snapshot_retrieved_at=datetime(2026, 7, 10, 16, 0, tzinfo=UTC),
         rights_evidence="cc_by",
         license_name="CC BY 4.0",
@@ -295,14 +304,43 @@ async def test_reviewed_single_column_pdf_generates_a_verified_epub_when_no_othe
     assert result.provenance.transformation == "generated"
     assert result.provenance.original_sha256 == hashlib.sha256(source_content).hexdigest()
     assert result.provenance.retrieved_at == datetime(2026, 7, 10, 16, 0, tzinfo=UTC)
-    assert result.provenance.generator_version == "guarded-pdf/1 + structured-epub/1"
+    assert result.provenance.generator_version == "guarded-pdf/3 + structured-epub/1"
     assert "accounted for 3 PDF body blocks" in result.provenance.transformation_steps
+    assert "removed running_header (p1-l1)" in result.provenance.transformation_steps
+    assert "removed page_number (p2-l3)" in result.provenance.transformation_steps
     artifact = await store.get(result.delivery.download_token)
     assert artifact is not None
     with zipfile.ZipFile(io.BytesIO(bytes(artifact.content))) as archive:
         chapter = archive.read("EPUB/chapter-001.xhtml").decode()
-    assert "hyphenation across a source line." in chapter
+        package = archive.read("EPUB/package.opf").decode()
+        license_notice = archive.read("EPUB/license.xhtml").decode()
+    assert "hyphen-ation across a source line." in chapter
     assert "Reviewed source header" not in chapter
+    assert f"urn:sha256:{hashlib.sha256(source_content).hexdigest()}" in package
+    assert '<meta name="source-format" content="application/pdf"/>' in package
+    assert "authorized PDF source" in license_notice
+    assert hashlib.sha256(source_content).hexdigest() in license_notice
+
+
+@pytest.mark.anyio
+async def test_pdf_layout_profile_mismatch_stops_before_epub_validation_or_delivery():
+    entry = replace(
+        pdf_entry(_single_column_pdf()),
+        expected_analysis_sha256="0" * 64,
+    )
+    validator = StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[]))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        pdf_catalog=ApprovedPdfCatalog(entries=(entry,)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=validator,
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    with pytest.raises(ValidationFailed, match="layout profile"):
+        await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert validator.calls == 0
 
 
 @pytest.mark.anyio
@@ -327,13 +365,18 @@ async def test_complex_pdf_refuses_before_validation_or_delivery():
 
 
 @pytest.mark.anyio
-async def test_rights_denied_pdf_never_enters_pdf_analysis():
+async def test_rights_denied_pdf_never_enters_pdf_analysis(monkeypatch):
     denied_pdf = replace(
         pdf_entry(b"this is intentionally not a PDF"),
         rights_evidence="all_rights_reserved",
         attribution=None,
     )
     validator = StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[]))
+    monkeypatch.setattr(
+        service_module,
+        "analyze_pdf",
+        lambda *_args, **_kwargs: pytest.fail("rights-denied PDF entered analysis"),
+    )
     service = EditionResolutionService(
         catalog=ApprovedEpubCatalog(entries=()),
         pdf_catalog=ApprovedPdfCatalog(entries=(denied_pdf,)),
@@ -400,6 +443,34 @@ async def test_pdf_fallback_preserves_a_rejected_structured_source_in_provenance
         "Rejected structured source",
         "Reviewed PDF source",
     ]
+
+
+@pytest.mark.anyio
+async def test_pdf_layout_refusal_remains_visible_after_a_structured_source_validation_failure():
+    invalid_structured = replace(
+        structured_entry(b"<html><body><h1>Chapter</h1><p>Stale snapshot.</p></body></html>"),
+        entry_id="structured:invalid-before-pdf",
+        work_title="Authorized PDF Source",
+        digital_title="Authorized PDF Source",
+        digital_identifier="https://example.invalid/invalid-before-pdf",
+        source_organization="Invalid structured source",
+        expected_source_sha256="0" * 64,
+    )
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        structured_catalog=ApprovedStructuredCatalog(entries=(invalid_structured,)),
+        pdf_catalog=ApprovedPdfCatalog(entries=(pdf_entry(_two_column_pdf()),)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "unavailable"
+    assert result.reason == (
+        "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+    )
 
 
 @pytest.mark.anyio

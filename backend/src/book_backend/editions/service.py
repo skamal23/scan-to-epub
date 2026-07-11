@@ -11,7 +11,7 @@ from book_backend.epubs.artifacts import EpubDelivery
 from book_backend.epubs.generation import GenerationRejected, StructuredSource, generate_epub
 from book_backend.epubs.safety import InvalidEpub, inspect_epub
 from book_backend.epubs.validator import EpubcheckResult
-from book_backend.pdfs.analysis import PdfRejected, analyze_pdf
+from book_backend.pdfs.analysis import PdfRejected, analysis_profile_sha256, analyze_pdf
 from book_backend.rights.policy import decide_rights
 
 from .errors import SourceUnavailable, ValidationFailed
@@ -147,14 +147,14 @@ class EditionResolutionService:
             return pdf_fallback
 
         generated_fallback = _preferred_unavailable(structured_fallback, pdf_fallback)
+        if generated_fallback.reason != "No reviewed open edition is available for this work yet.":
+            return generated_fallback
         if fallback_validation_failed is not None:
             raise fallback_validation_failed
         if validation_failed is not None:
             raise validation_failed
         if source_unavailable is not None:
             raise source_unavailable
-        if generated_fallback.reason != "No reviewed open edition is available for this work yet.":
-            return generated_fallback
         if entries and not rights_eligible:
             return EditionResolutionResult(
                 status="unavailable",
@@ -495,6 +495,8 @@ class EditionResolutionService:
         if source_sha256 != entry.expected_pdf_sha256:
             raise ValidationFailed("The reviewed PDF source no longer matches its pinned hash")
         analysis = analyze_pdf(entry.content, title=entry.digital_title)
+        if analysis_profile_sha256(analysis) != entry.expected_analysis_sha256:
+            raise ValidationFailed("The reviewed PDF layout profile no longer matches its snapshot")
         generated_at = datetime.now(UTC).replace(microsecond=0)
         generated = generate_epub(
             StructuredSource(
@@ -508,6 +510,8 @@ class EditionResolutionService:
                 license_url=entry.license_url,
                 attribution=entry.attribution
                 or f"{', '.join(entry.authors)}, {entry.license_name}.",
+                original_source_sha256=source_sha256,
+                original_source_format="pdf",
             ),
             generated_at=generated_at.isoformat().replace("+00:00", "Z"),
         )
@@ -541,6 +545,10 @@ class EditionResolutionService:
             ) from error
         artifact_steps = [
             f"removed {len(analysis.removed_blocks)} classified PDF artifacts",
+            *[
+                f"removed {removed.reason} ({removed.block_id})"
+                for removed in analysis.removed_blocks
+            ],
             "normalized authorized PDF into HTML",
             "packaged deterministic EPUB",
         ]

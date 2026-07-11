@@ -24,6 +24,7 @@ _REJECTED_TAGS = frozenset(
 )
 _SAFE_ID = re.compile(r"[A-Za-z][A-Za-z0-9_.:-]{0,127}\Z")
 _SAFE_LANGUAGE = re.compile(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8}){0,7}\Z")
+_SHA256 = re.compile(r"[a-f0-9]{64}\Z")
 _TEXT_ONLY_CONTAINERS = frozenset({"h1", "h2", "h3", "p", "pre"}) | _INLINE_TAGS
 _MIXED_CONTAINERS = frozenset({"aside", "blockquote", "li"})
 _STRUCTURAL_TEXT_BOUNDARIES = _ROOT_BLOCK_TAGS | frozenset({"li"})
@@ -48,6 +49,8 @@ class StructuredSource:
     license_url: str
     attribution: str
     content_format: str = "html"
+    original_source_sha256: str | None = None
+    original_source_format: str = "structured"
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,9 +89,10 @@ def generate_epub(source: StructuredSource, *, generated_at: str) -> GeneratedEp
     normalized_output_text = _generated_chapter_text(content)
     if normalized_output_text != normalized_source_text:
         raise GenerationRejected("Generated EPUB text did not match the structured source")
+    source_sha256 = _original_source_sha256(source)
     return GeneratedEpub(
         content=content,
-        source_sha256=hashlib.sha256(source.content).hexdigest(),
+        source_sha256=source_sha256,
         final_sha256=hashlib.sha256(content).hexdigest(),
         normalized_source_text=normalized_source_text,
         normalized_output_text=normalized_output_text,
@@ -425,13 +429,35 @@ def _normalize_inline_text(value: str) -> str:
     return " ".join(value.split())
 
 
+def _original_source_sha256(source: StructuredSource) -> str:
+    if source.original_source_format not in {"structured", "pdf"}:
+        raise GenerationRejected("Original source format is not eligible for EPUB generation")
+    if source.original_source_format == "pdf" and source.original_source_sha256 is None:
+        raise GenerationRejected("PDF conversion requires the original PDF hash")
+    if source.original_source_sha256 is None:
+        return hashlib.sha256(source.content).hexdigest()
+    if not _SHA256.fullmatch(source.original_source_sha256):
+        raise GenerationRejected("Original source hash is invalid")
+    return source.original_source_sha256
+
+
+def _source_media_type(source: StructuredSource) -> str:
+    if source.original_source_format == "pdf":
+        return "application/pdf"
+    return "text/plain" if source.content_format == "plain_text" else "text/html"
+
+
+def _source_label(source: StructuredSource) -> str:
+    return "PDF source" if source.original_source_format == "pdf" else "structured source"
+
+
 def _package_epub(
     source: StructuredSource,
     chapters: tuple[_Chapter, ...],
     generated_at: str,
 ) -> bytes:
     timestamp = _zip_timestamp(generated_at)
-    source_sha = hashlib.sha256(source.content).hexdigest()
+    source_sha = _original_source_sha256(source)
     output = io.BytesIO()
     with zipfile.ZipFile(output, "w") as archive:
         _write_entry(archive, "mimetype", b"application/epub+zip", timestamp, zipfile.ZIP_STORED)
@@ -508,6 +534,7 @@ def _package_document(
 {creators}
     <dc:language>{escape(source.language)}</dc:language>
     <dc:source>{escape(source.canonical_url)}</dc:source>
+    <meta name="source-format" content="{_source_media_type(source)}"/>
     <meta property="dcterms:modified">{escape(generated_at)}</meta>
     <meta property="schema:accessMode">textual</meta>
     <meta property="schema:accessModeSufficient">textual</meta>
@@ -559,13 +586,19 @@ def _typographic_cover(source: StructuredSource) -> str:
 def _license_document(source: StructuredSource) -> str:
     source_url = escape(source.canonical_url, quote=True)
     license_url = escape(source.license_url, quote=True)
+    source_sha = _original_source_sha256(source)
+    source_notice = (
+        "<p>This EPUB was generated deterministically from the authorized "
+        f"{_source_label(source)}. "
+        "No generative text changes were made.</p>"
+    )
     body = (
         "<section><h1>Source and license</h1>"
         f"<p>{escape(source.attribution)}</p>"
         f'<p>Source: <a href="{source_url}">{escape(source.canonical_url)}</a></p>'
+        f"<p>Original source SHA-256: {source_sha}</p>"
         f'<p>License: <a href="{license_url}">{escape(source.license_name)}</a></p>'
-        "<p>This EPUB was generated deterministically from the authorized structured source. "
-        "No generative text changes were made.</p></section>"
+        f"{source_notice}</section>"
     )
     return _xhtml_document(source.language, "Source and license", body)
 

@@ -1,6 +1,7 @@
+import hashlib
 import io
+import json
 import re
-from collections import Counter
 from dataclasses import dataclass
 from html import escape
 from statistics import median
@@ -9,11 +10,17 @@ import pdfplumber
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
-ANALYZER_VERSION = "guarded-pdf/1"
+ANALYZER_VERSION = "guarded-pdf/3"
 _PAGE_NUMBER = re.compile(r"(?:page\s+)?\d{1,4}\Z", re.IGNORECASE)
-_MATH_SYMBOL = re.compile(r"[=±√∑∫{}]")
-_FOOTNOTE_MARKER = re.compile(r"(?:\d+[.)\]]|[*†‡])\s")
+_FOOTNOTE_LINE_MARKER = re.compile(
+    r"(?:\[\d{1,4}\]|\(\d{1,4}\)|\d{1,4}[.)]?|[¹²³⁴⁵⁶⁷⁸⁹⁰]+|[*†‡])(?:\s|\Z)"
+)
+_FOOTNOTE_REFERENCE = re.compile(r"(?:\[\d{1,4}\]|\(\d{1,4}\)|[¹²³⁴⁵⁶⁷⁸⁹⁰]+)")
+_SIMPLE_PROSE_PUNCTUATION = frozenset(".,;:!?…'\"“”‘’()[]–—\u00ad")
+_SUPERSCRIPT_DIGITS = frozenset("⁰¹²³⁴⁵⁶⁷⁸⁹")
 _MAX_PAGES = 50
+_MAX_BODY_LEFT_EDGE_DRIFT = 18.0
+_MAX_INLINE_WORD_GAP = 5.0
 
 
 class PdfRejected(ValueError):
@@ -95,15 +102,7 @@ def analyze_pdf(content: bytes, *, title: str) -> PdfAnalysis:
     removed, body = _classify_lines(lines)
     _validate_body_layout(body)
     paragraphs = _paragraphs_from_body(body)
-    accounted_block_ids = tuple(
-        block_id for paragraph in paragraphs for block_id in paragraph.source_block_ids
-    )
-    expected_block_ids = tuple(block.block_id for block in body)
-    if (
-        len(accounted_block_ids) != len(set(accounted_block_ids))
-        or accounted_block_ids != expected_block_ids
-    ):
-        raise PdfRejected("PDF body-text accounting was incomplete or duplicated")
+    accounted_block_ids = _validate_body_accounting(body, paragraphs)
 
     normalized_body_text = "\n\n".join(_normalize_text(paragraph.text) for paragraph in paragraphs)
     if not normalized_body_text:
@@ -136,17 +135,57 @@ def analyze_pdf(content: bytes, *, title: str) -> PdfAnalysis:
     )
 
 
+def analysis_profile_sha256(analysis: PdfAnalysis) -> str:
+    """Return the reviewed structural profile for a source-PDF snapshot."""
+
+    payload = {
+        "analyzerVersion": analysis.analyzer_version,
+        "bodyBlocks": [
+            {
+                "blockId": block.block_id,
+                "lineNumber": block.line_number,
+                "pageNumber": block.page_number,
+                "text": block.text,
+            }
+            for block in analysis.body_blocks
+        ],
+        "normalizedBodyText": analysis.normalized_body_text,
+        "removedBlocks": [
+            {
+                "blockId": block.block_id,
+                "lineNumber": block.line_number,
+                "pageNumber": block.page_number,
+                "reason": block.reason,
+                "text": block.text,
+            }
+            for block in analysis.removed_blocks
+        ],
+    }
+    encoded = json.dumps(
+        payload,
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    ).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
 def _validate_pdf_container(content: bytes) -> None:
     if not content.startswith(b"%PDF-"):
         raise PdfRejected("Source is not a PDF document")
     try:
         reader = PdfReader(io.BytesIO(content))
-    except PdfReadError as error:
+        if reader.is_encrypted:
+            raise PdfRejected("Encrypted PDFs are not eligible for conversion")
+        if not reader.pages:
+            raise PdfRejected("PDF has no pages")
+        root = reader.trailer.get("/Root")
+        if root is not None and root.get("/AcroForm") is not None:
+            raise PdfRejected("PDF forms or XFA data are not eligible for conversion")
+    except PdfRejected:
+        raise
+    except (PdfReadError, AttributeError, KeyError, TypeError) as error:
         raise PdfRejected("PDF container could not be read") from error
-    if reader.is_encrypted:
-        raise PdfRejected("Encrypted PDFs are not eligible for conversion")
-    if not reader.pages:
-        raise PdfRejected("PDF has no pages")
 
 
 def _extract_lines(document: pdfplumber.PDF) -> tuple[_PdfLine, ...]:
@@ -176,7 +215,7 @@ def _extract_lines(document: pdfplumber.PDF) -> tuple[_PdfLine, ...]:
             chars = raw["chars"]
             if not chars:
                 raise PdfRejected("PDF text layout could not be analyzed safely")
-            if "\ufffd" in text or _MATH_SYMBOL.search(text):
+            if "\ufffd" in text or not _is_simple_prose_line(text):
                 raise PdfRejected("PDF text quality or notation is not eligible for conversion")
             lines.append(
                 _PdfLine(
@@ -197,6 +236,49 @@ def _extract_lines(document: pdfplumber.PDF) -> tuple[_PdfLine, ...]:
     return tuple(lines)
 
 
+def _is_simple_prose_line(text: str) -> bool:
+    """Accept only uncomplicated prose punctuation before conversion.
+
+    The guarded path deliberately excludes mathematical, code-like, list-like,
+    and other notation that cannot be represented as verified linear prose. A
+    hyphen remains valid only inside a word or as a line-ending continuation.
+    """
+
+    for index, character in enumerate(text):
+        if character in _SUPERSCRIPT_DIGITS:
+            return False
+        if character == "-":
+            previous_word = _alphanumeric_word_before(text, index)
+            following_word = _alphanumeric_word_after(text, index)
+            if _is_hyphenated_prose_word(previous_word) and (
+                not following_word or _is_hyphenated_prose_word(following_word)
+            ):
+                continue
+            return False
+        if character.isalnum() or character.isspace() or character in _SIMPLE_PROSE_PUNCTUATION:
+            continue
+        return False
+    return True
+
+
+def _alphanumeric_word_before(text: str, index: int) -> str:
+    start = index
+    while start and text[start - 1].isalnum():
+        start -= 1
+    return text[start:index]
+
+
+def _alphanumeric_word_after(text: str, index: int) -> str:
+    end = index + 1
+    while end < len(text) and text[end].isalnum():
+        end += 1
+    return text[index + 1 : end]
+
+
+def _is_hyphenated_prose_word(value: str) -> bool:
+    return len(value) >= 2 and value.isalpha()
+
+
 def _reject_multi_column_word_rows(page: pdfplumber.page.Page) -> None:
     words_by_row: dict[int, list[dict]] = {}
     for word in page.extract_words():
@@ -205,25 +287,38 @@ def _reject_multi_column_word_rows(page: pdfplumber.page.Page) -> None:
     for words in words_by_row.values():
         ordered = sorted(words, key=lambda word: float(word["x0"]))
         if any(
-            float(following["x0"]) - float(previous["x1"]) >= page.width * 0.2
+            float(following["x0"]) - float(previous["x1"]) >= _MAX_INLINE_WORD_GAP
             for previous, following in zip(ordered, ordered[1:], strict=False)
         ):
             separated_rows += 1
-    if separated_rows >= 2:
+    if separated_rows:
         raise PdfRejected("PDF has multiple text columns")
 
 
 def _classify_lines(
     lines: tuple[_PdfLine, ...],
 ) -> tuple[list[tuple[_PdfLine, str]], list[_PdfLine]]:
-    header_counts = Counter(
-        line.text.casefold() for line in lines if line.top <= line.page_height * 0.15
-    )
-    repeated_headers = {text for text, count in header_counts.items() if count >= 2}
+    top_lines_by_text: dict[str, list[_PdfLine]] = {}
+    for line in lines:
+        if line.top <= line.page_height * 0.15:
+            top_lines_by_text.setdefault(line.text.casefold(), []).append(line)
+    confident_header_ids: set[str] = set()
+    ambiguous_header_ids: set[str] = set()
+    for candidates in top_lines_by_text.values():
+        if len(candidates) < 2:
+            continue
+        target = (
+            confident_header_ids
+            if _is_confident_running_header(candidates, lines)
+            else ambiguous_header_ids
+        )
+        target.update(line.block_id for line in candidates)
     removed: list[tuple[_PdfLine, str]] = []
     body: list[_PdfLine] = []
     for line in lines:
-        if line.top <= line.page_height * 0.15 and line.text.casefold() in repeated_headers:
+        if line.block_id in ambiguous_header_ids:
+            raise PdfRejected("PDF has an ambiguous running header")
+        if line.block_id in confident_header_ids:
             removed.append((line, "running_header"))
         elif line.bottom >= line.page_height * 0.85 and _PAGE_NUMBER.fullmatch(line.text):
             removed.append((line, "page_number"))
@@ -236,6 +331,34 @@ def _classify_lines(
     return removed, body
 
 
+def _is_confident_running_header(
+    candidates: list[_PdfLine],
+    all_lines: tuple[_PdfLine, ...],
+) -> bool:
+    if len({line.page_number for line in candidates}) < 2:
+        return False
+    if max(line.x0 for line in candidates) - min(line.x0 for line in candidates) > 6:
+        return False
+    if max(line.top for line in candidates) - min(line.top for line in candidates) > 6:
+        return False
+    candidate_ids = {line.block_id for line in candidates}
+    for page_number in {line.page_number for line in candidates}:
+        page_font_sizes = [
+            line.font_size
+            for line in all_lines
+            if line.page_number == page_number and line.block_id not in candidate_ids
+        ]
+        if not page_font_sizes:
+            return False
+        body_font_size = max(page_font_sizes)
+        if any(
+            line.page_number == page_number and line.font_size >= body_font_size * 0.95
+            for line in candidates
+        ):
+            return False
+    return True
+
+
 def _validate_body_layout(body: list[_PdfLine]) -> None:
     by_page: dict[int, list[_PdfLine]] = {}
     for line in body:
@@ -244,28 +367,20 @@ def _validate_body_layout(body: list[_PdfLine]) -> None:
         _reject_ambiguous_footnotes(lines)
         _reject_multi_column_layout(lines)
         sorted_lines = sorted(lines, key=lambda line: (line.top, line.x0))
-        if any(
-            following.top + 0.5 < previous.top
-            for previous, following in zip(sorted_lines, sorted_lines[1:], strict=False)
-        ):
+        if tuple(line.block_id for line in lines) != tuple(line.block_id for line in sorted_lines):
             raise PdfRejected("PDF reading order is ambiguous")
 
 
 def _reject_ambiguous_footnotes(lines: list[_PdfLine]) -> None:
-    body_font_size = median(line.font_size for line in lines)
     for line in lines:
-        if line.font_size <= body_font_size * 0.8 and _FOOTNOTE_MARKER.match(line.text):
+        if _FOOTNOTE_LINE_MARKER.match(line.text) or _FOOTNOTE_REFERENCE.search(line.text):
             raise PdfRejected("PDF has an ambiguous footnote relationship")
 
 
 def _reject_multi_column_layout(lines: list[_PdfLine]) -> None:
-    positions: dict[int, list[float]] = {}
-    for line in lines:
-        positions.setdefault(round(line.x0 / 12), []).append(line.x0)
-    left_edges = [sum(values) / len(values) for values in positions.values()]
-    for index, left in enumerate(left_edges):
-        if any(abs(right - left) >= lines[0].page_width * 0.2 for right in left_edges[index + 1 :]):
-            raise PdfRejected("PDF has multiple text columns")
+    left_edge = min(line.x0 for line in lines)
+    if any(line.x0 - left_edge >= _MAX_BODY_LEFT_EDGE_DRIFT for line in lines):
+        raise PdfRejected("PDF has multiple text columns")
 
 
 def _paragraphs_from_body(body: list[_PdfLine]) -> tuple[_Paragraph, ...]:
@@ -306,9 +421,30 @@ def _paragraphs_from_page(lines: list[_PdfLine]) -> tuple[_Paragraph, ...]:
     return tuple(paragraphs)
 
 
+def _validate_body_accounting(
+    body: list[_PdfLine],
+    paragraphs: tuple[_Paragraph, ...],
+) -> tuple[str, ...]:
+    accounted_block_ids = tuple(
+        block_id for paragraph in paragraphs for block_id in paragraph.source_block_ids
+    )
+    expected_block_ids = tuple(block.block_id for block in body)
+    if (
+        len(accounted_block_ids) != len(set(accounted_block_ids))
+        or accounted_block_ids != expected_block_ids
+    ):
+        raise PdfRejected("PDF body-text accounting was incomplete, duplicated, or reordered")
+    return accounted_block_ids
+
+
 def _join_source_lines(previous: str, following: str) -> str:
-    if previous.endswith("-") and following and following[0].islower():
+    if previous.endswith("\u00ad"):
         return previous[:-1] + following
+    if previous.endswith("-") and following and following[0].islower():
+        joined = previous + following
+        if not _is_simple_prose_line(joined):
+            raise PdfRejected("PDF text quality or notation is not eligible for conversion")
+        return joined
     return f"{previous} {following}"
 
 
@@ -327,5 +463,6 @@ __all__ = [
     "PdfBodyBlock",
     "PdfRejected",
     "PdfRemovedBlock",
+    "analysis_profile_sha256",
     "analyze_pdf",
 ]

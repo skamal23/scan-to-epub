@@ -10,7 +10,8 @@ from book_backend.epubs.artifacts import EphemeralEpubStore
 from book_backend.epubs.generation import GenerationRejected, StructuredSource, generate_epub
 from book_backend.epubs.safety import InvalidEpub, inspect_epub
 from book_backend.epubs.validator import EpubcheckValidator
-from book_backend.pdfs.analysis import PdfRejected, analyze_pdf
+from book_backend.pdfs.analysis import PdfRejected, analysis_profile_sha256, analyze_pdf
+from book_backend.rights.policy import decide_rights
 
 from .errors import ValidationFailed
 from .models import (
@@ -73,8 +74,9 @@ def _fixture_pdf_bytes() -> bytes:
         ),
         start=1,
     ):
-        document.setFont("Times-Roman", 10)
+        document.setFont("Times-Roman", 8)
         document.drawString(72, 760, "Test-only PDF header")
+        document.setFont("Times-Roman", 10)
         y = 720
         for line in lines:
             document.drawString(72, y, line)
@@ -99,6 +101,42 @@ def _fixture_complex_pdf_bytes() -> bytes:
 
 _PDF_FIXTURES = {"fixture:generated-pdf": _fixture_pdf_bytes()}
 _PDF_REFUSAL_FIXTURES = {"fixture:pdf-refused": _fixture_complex_pdf_bytes()}
+_PDF_FIXTURE_SHA256 = hashlib.sha256(_PDF_FIXTURES["fixture:generated-pdf"]).hexdigest()
+_PDF_REFUSAL_FIXTURE_SHA256 = hashlib.sha256(
+    _PDF_REFUSAL_FIXTURES["fixture:pdf-refused"]
+).hexdigest()
+_PDF_FIXTURE_ANALYSIS_SHA256 = "070a9e92427a265f242d96135650512c7de863d6b66613e395356df6ee65377e"
+_PDF_FIXTURE_ATTRIBUTION = "Book to EPUB PDF test fixture."
+
+
+def _fixture_physical_edition(request: EditionResolveRequest) -> PhysicalEditionInfo:
+    return PhysicalEditionInfo(
+        candidate_id=request.candidate_id,
+        title=request.work_title,
+        authors=request.work_authors,
+        isbn13=request.physical_isbn13,
+        publisher=request.physical_publisher,
+        published_date=request.physical_published_date,
+        source_ids=request.edition_source_ids,
+    )
+
+
+def _pdf_fixture_rights_failure(request: EditionResolveRequest) -> EditionResolutionResult | None:
+    decision = decide_rights(
+        "cc_by",
+        "generated_epub",
+        request.territory,
+        preserves_sharealike=False,
+    )
+    if decision.outcome == "generate" and (
+        not decision.requires_attribution or _PDF_FIXTURE_ATTRIBUTION
+    ):
+        return None
+    return EditionResolutionResult(
+        status="unavailable",
+        reason="The available source did not pass the demo's rights policy.",
+        physical_edition=_fixture_physical_edition(request),
+    )
 
 
 class FixtureEditionResolutionService:
@@ -288,8 +326,18 @@ class FixtureEditionResolutionService:
         request: EditionResolveRequest,
         source_content: bytes,
     ) -> EditionResolutionResult:
+        rights_failure = _pdf_fixture_rights_failure(request)
+        if rights_failure is not None:
+            return rights_failure
+        source_sha256 = hashlib.sha256(source_content).hexdigest()
+        if source_sha256 != _PDF_FIXTURE_SHA256:
+            raise ValidationFailed("The test-only PDF source no longer matches its pinned hash")
         try:
             analysis = analyze_pdf(source_content, title=request.work_title)
+            if analysis_profile_sha256(analysis) != _PDF_FIXTURE_ANALYSIS_SHA256:
+                raise ValidationFailed(
+                    "The test-only PDF layout profile no longer matches its reviewed snapshot"
+                )
             generated = generate_epub(
                 StructuredSource(
                     source_id=request.candidate_id,
@@ -300,7 +348,9 @@ class FixtureEditionResolutionService:
                     content=analysis.intermediate_html,
                     license_name="Test-only PDF source",
                     license_url="https://example.invalid/test-only-generated-pdf",
-                    attribution="Book to EPUB PDF test fixture.",
+                    attribution=_PDF_FIXTURE_ATTRIBUTION,
+                    original_source_sha256=source_sha256,
+                    original_source_format="pdf",
                 ),
                 generated_at=_FIXTURE_RETRIEVED_AT.isoformat().replace("+00:00", "Z"),
             )
@@ -327,7 +377,6 @@ class FixtureEditionResolutionService:
             )
         except ValueError as error:
             raise ValidationFailed("The test-only PDF EPUB could not be delivered") from error
-        source_sha256 = hashlib.sha256(source_content).hexdigest()
         return EditionResolutionResult(
             status="ready",
             physical_edition=PhysicalEditionInfo(
@@ -359,7 +408,7 @@ class FixtureEditionResolutionService:
                     "This test-only EPUB is generated from a purpose-built PDF fixture. "
                     "It is not a source for a real book."
                 ),
-                attribution="Book to EPUB PDF test fixture.",
+                attribution=_PDF_FIXTURE_ATTRIBUTION,
                 territory=request.territory,
             ),
             provenance=EditionProvenance(
@@ -380,6 +429,10 @@ class FixtureEditionResolutionService:
                     f"analyzed authorized PDF with {analysis.analyzer_version}",
                     f"accounted for {len(analysis.body_blocks)} PDF body blocks",
                     f"removed {len(analysis.removed_blocks)} classified PDF artifacts",
+                    *[
+                        f"removed {removed.reason} ({removed.block_id})"
+                        for removed in analysis.removed_blocks
+                    ],
                     "normalized authorized PDF into HTML",
                     "packaged deterministic EPUB",
                 ],
@@ -399,6 +452,12 @@ class FixtureEditionResolutionService:
         request: EditionResolveRequest,
         source_content: bytes,
     ) -> EditionResolutionResult:
+        rights_failure = _pdf_fixture_rights_failure(request)
+        if rights_failure is not None:
+            return rights_failure
+        source_sha256 = hashlib.sha256(source_content).hexdigest()
+        if source_sha256 != _PDF_REFUSAL_FIXTURE_SHA256:
+            raise ValidationFailed("The test-only PDF source no longer matches its pinned hash")
         try:
             analyze_pdf(source_content, title=request.work_title)
         except PdfRejected:
@@ -408,15 +467,7 @@ class FixtureEditionResolutionService:
                     "We found an authorized PDF, but could not safely convert its layout "
                     "into an EPUB."
                 ),
-                physical_edition=PhysicalEditionInfo(
-                    candidate_id=request.candidate_id,
-                    title=request.work_title,
-                    authors=request.work_authors,
-                    isbn13=request.physical_isbn13,
-                    publisher=request.physical_publisher,
-                    published_date=request.physical_published_date,
-                    source_ids=request.edition_source_ids,
-                ),
+                physical_edition=_fixture_physical_edition(request),
             )
         raise ValidationFailed("The test-only complex PDF unexpectedly passed the safety gate")
 

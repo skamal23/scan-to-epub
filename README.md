@@ -103,12 +103,12 @@ The production structured catalog intentionally starts empty: no external HTML o
 
 PDF conversion is a separate, stricter fallback. An existing reviewed EPUB and a reviewed structured source are still preferred. A PDF may proceed only from a reviewed, hash-pinned snapshot after the U.S. rights decision has authorized transformation.
 
-- The current gate accepts only unencrypted, consistently sized, text-based, single-column PDFs with no images, forms, tables, mathematical notation, or unclassified footer/marginalia.
+- The current gate accepts only unencrypted, consistently sized, text-based PDFs with one stable body left edge, simple prose-only punctuation, and no images, forms/XFA data, tables (including a single tightly spaced borderless row), mathematical notation, footnote markers, or unclassified footer/marginalia.
 - It removes only repeated top-of-page running headers and numeric page footers, records every removal, and requires every remaining source line to be accounted for exactly once and in reading order.
-- It joins a line-end hyphen only when the following line begins with a lowercase continuation. Other visible hyphens remain unchanged.
-- Its deterministic HTML output enters the same EPUB safety, text-integrity, EPUBCheck, delivery-token, Books, and Files path as other generated editions.
+- It preserves ordinary line-end hyphens; it removes only an explicit soft hyphen, whose discretionary meaning is unambiguous.
+- Every accepted snapshot must also match its reviewed structural-profile hash. Its deterministic HTML output enters the same EPUB safety, text-integrity, EPUBCheck, delivery-token, Books, and Files path as other generated editions.
 
-Complex layouts and scans fail closed with “We found an authorized PDF, but could not safely convert its layout into an EPUB.” They never get a download action. The production PDF catalog also starts empty until each exact PDF snapshot, source URL, hash, license, and retrieval timestamp has been reviewed. The development-only PDF scenario uses a purpose-built fixture and is not a source for a real book.
+Complex layouts and scans fail closed with “We found an authorized PDF, but could not safely convert its layout into an EPUB.” They never get a download action. The production PDF catalog also starts empty until each exact PDF snapshot, source URL, source hash, reviewed analysis profile, license, and retrieval timestamp has been reviewed. The development-only PDF scenario uses a purpose-built fixture and is not a source for a real book.
 
 ## Verification
 
