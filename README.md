@@ -59,6 +59,8 @@ ipconfig getifaddr en0
 
 Create `mobile/.env.local` from `mobile/.env.example`, set `EXPO_PUBLIC_API_URL` to the printed LAN address (for example, `http://10.0.0.12:8000`), and restart Expo. The backend listens on all local interfaces only in this explicit phone-development command; do not expose it to an untrusted network.
 
+The local demo sends no-store, no-referrer, and content-type hardening headers on every response. A hosted public backend must enforce HTTPS at its deployment boundary; do not treat the local Wi-Fi HTTP workflow as a public deployment configuration.
+
 ```bash
 cd mobile
 pnpm start

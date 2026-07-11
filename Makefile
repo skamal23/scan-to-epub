@@ -7,16 +7,16 @@ backend-install:
 	$(PYTHON) -m pip install -e './backend[dev]'
 
 backend-run:
-	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=true $(PYTHON) -m uvicorn book_backend.app:app --host 127.0.0.1 --port 8000
+	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=true $(PYTHON) -m uvicorn book_backend.app:app --no-access-log --host 127.0.0.1 --port 8000
 
 backend-run-live:
-	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=false $(PYTHON) -m uvicorn book_backend.app:app --host 127.0.0.1 --port 8000
+	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=false $(PYTHON) -m uvicorn book_backend.app:app --no-access-log --host 127.0.0.1 --port 8000
 
 backend-run-phone:
-	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=true $(PYTHON) -m uvicorn book_backend.app:app --host 0.0.0.0 --port 8000
+	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=true $(PYTHON) -m uvicorn book_backend.app:app --no-access-log --host 0.0.0.0 --port 8000
 
 backend-run-phone-live:
-	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=false $(PYTHON) -m uvicorn book_backend.app:app --host 0.0.0.0 --port 8000
+	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=false $(PYTHON) -m uvicorn book_backend.app:app --no-access-log --host 0.0.0.0 --port 8000
 
 backend-test:
 	$(PYTHON) -m pytest backend -q

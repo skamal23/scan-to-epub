@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: backend
     buildCommand: pip install .
-    startCommand: uvicorn book_backend.app:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn book_backend.app:app --no-access-log --host 0.0.0.0 --port $PORT
     healthCheckPath: /health
     envVars:
       - key: BOOK_ENVIRONMENT

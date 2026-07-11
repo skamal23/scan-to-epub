@@ -46,6 +46,15 @@ class EditionResolver(Protocol):
     async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult: ...
 
 
+def _cover_content_length(request: Request) -> int | None:
+    value = request.headers.get("content-length")
+    if value is None:
+        return None
+    if not value.isascii() or not value.isdecimal():
+        raise HTTPException(status_code=400, detail="Cover size could not be read")
+    return int(value)
+
+
 def create_app(
     settings: Settings,
     metadata_service: MetadataSearchService | None = None,
@@ -107,9 +116,16 @@ def create_app(
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
-        request_id = request.headers.get("x-request-id") or str(uuid4())
+        request_id = str(uuid4())
         response = await call_next(request)
-        response.headers["x-request-id"] = request_id
+        response.headers.update(
+            {
+                "Cache-Control": "no-store",
+                "Referrer-Policy": "no-referrer",
+                "X-Content-Type-Options": "nosniff",
+                "X-Request-ID": request_id,
+            }
+        )
         REQUEST_LOGGER.info(
             "%s %s %s",
             request.method,
@@ -137,8 +153,8 @@ def create_app(
         content_type = request.headers.get("content-type", "").partition(";")[0].strip().lower()
         if content_type not in {"image/jpeg", "image/png"}:
             raise HTTPException(status_code=415, detail="Send a JPEG or PNG cover image")
-        content_length = request.headers.get("content-length")
-        if content_length and int(content_length) > settings.cover_max_bytes:
+        content_length = _cover_content_length(request)
+        if content_length is not None and content_length > settings.cover_max_bytes:
             raise HTTPException(status_code=413, detail="Cover image is too large")
         image_bytes = bytearray()
         async for chunk in request.stream():
