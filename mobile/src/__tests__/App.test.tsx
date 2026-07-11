@@ -20,9 +20,17 @@ jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
-jest.mock('../ui/Entrance', () => ({
-  Entrance: ({ children }: { children: React.ReactNode }) => children,
-}));
+jest.mock('../ui/Entrance', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    Entrance: ({ children }: { children: React.ReactNode }) => React.createElement(
+      View,
+      { testID: 'launch-entrance' },
+      children,
+    ),
+  };
+});
 
 import App from '../../App';
 import type { BackendClient } from '../api/health';
@@ -89,6 +97,17 @@ const metadataClient = (
   search: jest.fn().mockResolvedValue({ observedIsbn: null, ...result }),
 });
 
+async function settleLaunch() {
+  await act(async () => {
+    await Promise.resolve();
+  });
+}
+
+async function waitForHealthCheck(client: BackendClient, times = 1) {
+  await waitFor(() => expect(client.checkHealth).toHaveBeenCalledTimes(times));
+  await settleLaunch();
+}
+
 describe('<App />', () => {
   beforeEach(() => {
     jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
@@ -119,10 +138,7 @@ describe('<App />', () => {
     let screen: ReturnType<typeof render> | undefined;
 
     try {
-      await waitFor(() => expect(app.getByText('Backend connected')).toBeTruthy());
-      await act(async () => {
-        await Promise.resolve();
-      });
+      await settleLaunch();
       expect(listeners.size).toBeGreaterThan(0);
 
       fireEvent.press(app.getByRole('button', { name: 'Open scanner' }));
@@ -145,7 +161,7 @@ describe('<App />', () => {
     const view = render(<App client={healthyClient()} showScenarioLauncher={false} />);
 
     try {
-      await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+      await settleLaunch();
       const launchRoot = view.UNSAFE_getByType(SafeAreaView);
 
       expect(StyleSheet.flatten(launchRoot.props.style).backgroundColor).toBe(colors.canvas);
@@ -154,17 +170,33 @@ describe('<App />', () => {
     }
   });
 
-  test('checks backend connectivity and enters the scanner shell', async () => {
+  test('shows a static scan-focused home and enters the scanner shell', async () => {
+    const client = healthyClient();
     const view = render(
-      <App client={healthyClient()} showScenarioLauncher={false} />,
+      <App client={client} showScenarioLauncher={false} />,
     );
 
-    expect(view.getByText('Checking backend…')).toBeTruthy();
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await waitForHealthCheck(client);
+    expect(view.getByText('Scan a book to get started.')).toBeTruthy();
+    expect(view.queryByText('RIGHTS-AWARE READING')).toBeNull();
+    expect(view.queryByText('Identify a physical book and find a verified open edition.')).toBeNull();
+    expect(view.queryByText('Backend connected')).toBeNull();
 
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
     expect(view.getByLabelText('Book scan guide')).toBeTruthy();
+  });
+
+  test('does not animate the fallback launch content', async () => {
+    const client = healthyClient();
+    const view = render(<App client={client} showScenarioLauncher={false} />);
+
+    try {
+      await waitForHealthCheck(client);
+      expect(view.queryByTestId('launch-entrance')).toBeNull();
+    } finally {
+      view.unmount();
+    }
   });
 
   test('shows an unavailable state and retries successfully', async () => {
@@ -184,22 +216,23 @@ describe('<App />', () => {
 
     await waitFor(() => expect(view.getByText('Backend unavailable')).toBeTruthy());
     fireEvent.press(view.getByRole('button', { name: 'Retry connection' }));
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
-    expect(client.checkHealth).toHaveBeenCalledTimes(2);
+    await waitForHealthCheck(client, 2);
+    expect(view.queryByText('Backend connected')).toBeNull();
+    expect(view.queryByRole('button', { name: 'Retry connection' })).toBeNull();
   });
 
   test('offers deterministic scenarios only in development builds', async () => {
     const hidden = render(
       <App client={healthyClient()} showScenarioLauncher={false} />,
     );
-    await waitFor(() => expect(hidden.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     expect(hidden.queryByText('Test scenarios')).toBeNull();
     hidden.unmount();
 
     const visible = render(
       <App client={healthyClient()} showScenarioLauncher={true} />,
     );
-    await waitFor(() => expect(visible.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(visible.getByRole('button', { name: 'Test scenarios' }));
     expect(visible.getByText('Scenario launcher')).toBeTruthy();
 
@@ -212,7 +245,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Ambiguous books' }));
 
@@ -225,7 +258,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Cover: strong match' }));
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
@@ -240,7 +273,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Search error' }));
     expect(view.getByText('Search unavailable')).toBeTruthy();
@@ -268,7 +301,7 @@ describe('<App />', () => {
         showScenarioLauncher={false}
       />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
 
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
@@ -301,7 +334,7 @@ describe('<App />', () => {
   test('opens deterministic verified and unavailable edition scenarios', async () => {
     const editions: EditionClient = { resolve: jest.fn().mockResolvedValue(readyEditionScenario) };
     const view = render(<App client={healthyClient()} editionClient={editions} showScenarioLauncher />);
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
     await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
@@ -318,7 +351,7 @@ describe('<App />', () => {
 
   test('opens a deterministic open-license fallback-details scenario', async () => {
     const view = render(<App client={healthyClient()} showScenarioLauncher />);
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Open-license fallback details' }));
 
@@ -335,7 +368,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Generated test EPUB' }));
 
@@ -356,7 +389,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Generated plain-text EPUB' }));
 
@@ -377,7 +410,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'PDF test EPUB' }));
 
@@ -398,7 +431,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'PDF conversion refused' }));
 
@@ -436,7 +469,7 @@ describe('<App />', () => {
         showScenarioLauncher
       />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
     await waitFor(() => expect(view.getByRole('button', { name: 'Open in Books' })).toBeTruthy());
@@ -454,7 +487,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Edition source offline' }));
     expect(view.getByText('Open-edition check unavailable')).toBeTruthy();
@@ -472,7 +505,7 @@ describe('<App />', () => {
         showScenarioLauncher={false}
       />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('Book title'), 'Missing book');
@@ -498,7 +531,7 @@ describe('<App />', () => {
         showScenarioLauncher={false}
       />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('Book title'), 'Pride and Prejudice');
@@ -519,7 +552,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher={false} />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('ISBN'), '9780141439518');
@@ -546,7 +579,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher={false} />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('Book title'), 'Pride and Prejudice');
@@ -570,7 +603,7 @@ describe('<App />', () => {
         showScenarioLauncher={false}
       />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Open scanner' }));
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('ISBN'), '9780141439518');
@@ -590,7 +623,7 @@ describe('<App />', () => {
     const view = render(
       <App client={healthyClient()} metadataClient={metadata} showScenarioLauncher />,
     );
-    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    await settleLaunch();
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Repeated ISBN' }));
 

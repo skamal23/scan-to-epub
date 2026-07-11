@@ -45,7 +45,6 @@ import {
   SecondaryButton,
   StatusMessage,
 } from './src/ui/primitives';
-import { Entrance } from './src/ui/Entrance';
 import { colors, radius, spacing, type } from './src/ui/theme';
 import { useReducedMotionStatus } from './src/ui/useReducedMotion';
 
@@ -413,48 +412,39 @@ export default function App({
     );
   }
 
-  const statusTone = state.connectivity === 'online'
-    ? 'success'
-    : state.connectivity === 'offline'
-      ? 'error'
-      : 'neutral';
-
   return (
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <Entrance>
-          <View style={styles.launchStack}>
-            <View style={styles.launchCopy}>
-              <Text style={styles.eyebrow}>RIGHTS-AWARE READING</Text>
-              <Text style={styles.title}>Book to EPUB</Text>
-              <Text style={styles.body}>
-                Identify a physical book and find a verified open edition.
-              </Text>
-            </View>
-            <View style={styles.connectionRow}>
-              <StatusMessage tone={statusTone} text={state.message} />
-            </View>
-            <View style={styles.buttonStack}>
-              <PrimaryButton
-                label="Open scanner"
-                onPress={() => {
-                  setScannerFixture(undefined);
-                  dispatch({ type: 'showScanner' });
-                }}
-              />
-              {state.connectivity === 'offline' ? (
-                <SecondaryButton label="Retry connection" onPress={() => void checkHealth()} />
-              ) : null}
-              {showScenarioLauncher ? (
-                <SecondaryButton
-                  label="Test scenarios"
-                  onPress={() => dispatch({ type: 'showScenarios' })}
-                />
-              ) : null}
-            </View>
+        <View style={styles.launchStack}>
+          <View style={styles.launchCopy}>
+            <Text style={styles.title}>Book to EPUB</Text>
+            <Text style={styles.body}>Scan a book to get started.</Text>
           </View>
-        </Entrance>
+          <View style={styles.buttonStack}>
+            <PrimaryButton
+              label="Open scanner"
+              onPress={() => {
+                setScannerFixture(undefined);
+                dispatch({ type: 'showScanner' });
+              }}
+            />
+            {state.connectivity === 'offline' ? (
+              <>
+                <View style={styles.connectionRow}>
+                  <StatusMessage tone="error" text={state.message} />
+                </View>
+                <SecondaryButton label="Retry connection" onPress={() => void checkHealth()} />
+              </>
+            ) : null}
+            {showScenarioLauncher ? (
+              <SecondaryButton
+                label="Test scenarios"
+                onPress={() => dispatch({ type: 'showScenarios' })}
+              />
+            ) : null}
+          </View>
+        </View>
       </View>
     </SafeAreaView>
   );
@@ -470,12 +460,6 @@ const styles = StyleSheet.create({
   },
   launchStack: { gap: spacing.xl },
   launchCopy: { gap: spacing.md },
-  eyebrow: {
-    color: colors.evergreen,
-    fontSize: type.eyebrow,
-    fontWeight: '700',
-    letterSpacing: 1.6,
-  },
   title: {
     color: colors.ink,
     fontSize: type.display,
