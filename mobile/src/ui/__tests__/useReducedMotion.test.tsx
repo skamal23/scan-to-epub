@@ -1,7 +1,7 @@
 import { act, render, waitFor } from '@testing-library/react-native';
 import { AccessibilityInfo, Text } from 'react-native';
 
-import { useReducedMotion } from '../useReducedMotion';
+import { useReducedMotion, useReducedMotionStatus } from '../useReducedMotion';
 
 let reduceMotionListener: ((enabled: boolean) => void) | undefined;
 let removeListener: jest.Mock;
@@ -11,6 +11,13 @@ function Probe() {
   const reducedMotion = useReducedMotion();
 
   return <Text>{reducedMotion ? 'reduced' : 'full'}</Text>;
+}
+
+function StatusProbe() {
+  const { isReady, reducedMotion } = useReducedMotionStatus();
+
+  if (!isReady) return <Text>unknown</Text>;
+  return <Text>{reducedMotion ? 'ready-reduced' : 'ready-full'}</Text>;
 }
 
 describe('useReducedMotion', () => {
@@ -35,18 +42,41 @@ describe('useReducedMotion', () => {
     jest.restoreAllMocks();
   });
 
-  test('uses the current Reduce Motion preference and listens for later changes', async () => {
-    mockIsReduceMotionEnabled.mockResolvedValue(true);
-    const view = render(<Probe />);
+  test('keeps the preference unknown until a deferred initial read or newer event resolves it', async () => {
+    let resolveInitialPreference!: (enabled: boolean) => void;
+    const initialPreference = new Promise<boolean>((resolve) => {
+      resolveInitialPreference = resolve;
+    });
+    mockIsReduceMotionEnabled.mockReturnValue(initialPreference);
+    const view = render(<StatusProbe />);
 
-    await waitFor(() => expect(view.getByText('reduced')).toBeTruthy());
-    expect(mockIsReduceMotionEnabled).toHaveBeenCalledTimes(1);
+    expect(view.getByText('unknown')).toBeTruthy();
 
     act(() => {
-      reduceMotionListener?.(false);
+      reduceMotionListener?.(true);
     });
 
-    expect(view.getByText('full')).toBeTruthy();
+    expect(view.getByText('ready-reduced')).toBeTruthy();
+
+    await act(async () => {
+      resolveInitialPreference(false);
+      await initialPreference;
+    });
+
+    expect(view.getByText('ready-reduced')).toBeTruthy();
+  });
+
+  test('uses the latest preference and listens for later changes', async () => {
+    const view = render(<Probe />);
+
+    expect(view.getByText('reduced')).toBeTruthy();
+    await waitFor(() => expect(view.getByText('full')).toBeTruthy());
+
+    act(() => {
+      reduceMotionListener?.(true);
+    });
+
+    expect(view.getByText('reduced')).toBeTruthy();
   });
 
   test('keeps a newer preference event when the initial read resolves later', async () => {
@@ -57,20 +87,20 @@ describe('useReducedMotion', () => {
     mockIsReduceMotionEnabled.mockReturnValue(initialPreference);
     const view = render(<Probe />);
 
-    expect(view.getByText('full')).toBeTruthy();
-
-    act(() => {
-      reduceMotionListener?.(true);
-    });
-
     expect(view.getByText('reduced')).toBeTruthy();
 
+    act(() => {
+      reduceMotionListener?.(false);
+    });
+
+    expect(view.getByText('full')).toBeTruthy();
+
     await act(async () => {
-      resolveInitialPreference(false);
+      resolveInitialPreference(true);
       await initialPreference;
     });
 
-    expect(view.getByText('reduced')).toBeTruthy();
+    expect(view.getByText('full')).toBeTruthy();
   });
 
   test('removes its preference listener when unmounted', async () => {
@@ -80,5 +110,20 @@ describe('useReducedMotion', () => {
     view.unmount();
 
     expect(removeListener).toHaveBeenCalledTimes(1);
+  });
+
+  test('starts later consumers with the latest known preference', async () => {
+    const first = render(<StatusProbe />);
+
+    expect(first.getByText('ready-full')).toBeTruthy();
+
+    const later = render(<StatusProbe />);
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(later.getByText('ready-full')).toBeTruthy();
+    expect(mockIsReduceMotionEnabled).toHaveBeenCalled();
   });
 });
