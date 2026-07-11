@@ -231,23 +231,23 @@ git commit -m "feat: open directly to book scanning"
 **Interfaces:**
 
 - Consumes: the existing `SearchState`, `MetadataCandidate`, navigation callbacks, and Task 1 UI foundation.
-- Produces: unchanged search/confirmation actions with a tokenized form, cover-led candidate card, visually quiet match metadata, and a minimal “Is this your book?” confirmation prompt.
+- Produces: unchanged search/confirmation actions with a tokenized form, cover-led candidate card showing only user-decision information, and a minimal “Is this your book?” confirmation prompt.
 
-- [ ] **Step 1: Add focused search visual/interaction tests**
+- [x] **Step 1: Add focused search visual/interaction tests**
 
-Create or extend a screen test that verifies a candidate card remains one accessible button named `Choose <title> by <author>`, retains its cover fallback, and renders its match reason after a press-state render. Add token-style expectations that the title uses `colors.ink` and the match reason uses `colors.evergreen`; both expectations fail against the current literal colors. Keep the existing long-title regression and add a case that verifies the title has no fixed single-line truncation.
+Create or extend a screen test that verifies a candidate card remains one accessible button named `Choose <title> by <author>`, retains its cover fallback, shows the title/author/physical-edition decision information, and omits match-reason/internal catalog text. Add a token-style expectation that the title uses `colors.ink`, which fails against the current literal color. Keep the existing long-title regression and add a case that verifies the title has no fixed single-line truncation.
 
-- [ ] **Step 2: Run the new test before changing styles**
+- [x] **Step 2: Run the new test before changing styles**
 
 Run: `cd mobile && pnpm test -- ManualSearchFlow.test.tsx App.test.tsx`
 
 Expected: the new card/typography contract fails only where the current component lacks the new explicit visual behavior.
 
-- [ ] **Step 3: Apply the editorial search treatment**
+- [x] **Step 3: Apply the editorial search treatment**
 
-Replace local palette literals with theme tokens, use `Entrance` for the form/candidate result content, increase title/cover hierarchy, use quiet surface borders, and make match-reason text a small evergreen supporting line. Simplify the default confirmation copy to “Is this your book?” and remove catalog/process explanation from the default candidate screen; preserve recovery warnings when a provider is unavailable. Preserve every form label, `testID`, `accessibilityLabel`, keyboard behavior, candidate button, provider warning, and long-title wrapping.
+Replace local palette literals with theme tokens, use `Entrance` for static form/candidate result content, increase title/cover hierarchy, and use quiet surface borders. Simplify the default confirmation copy to “Is this your book?” and remove match-reason/catalog/process explanation and decorative candidate scale motion from the default candidate screen; preserve recovery warnings when a provider is unavailable. Preserve every form label, `testID`, `accessibilityLabel`, keyboard behavior, candidate button, provider warning, and long-title wrapping.
 
-- [ ] **Step 4: Exercise the deterministic UI flows**
+- [x] **Step 4: Exercise the deterministic UI flows**
 
 Run: `cd mobile && pnpm test -- App.test.tsx ManualSearchFlow.test.tsx && pnpm typecheck`, then run each Simulator flow in its own process:
 
@@ -258,7 +258,7 @@ maestro test .maestro/phase3.yaml
 
 Expected: manual ISBN, ambiguity, catalog warning, long-title, strong-cover confirmation, ambiguous-cover recovery, and no-cover fallback all pass.
 
-- [ ] **Step 5: Commit the search slice**
+- [x] **Step 5: Commit the search slice**
 
 ```bash
 git add mobile/src/screens/ManualSearchFlow.tsx mobile/src/screens/__tests__/ManualSearchFlow.test.tsx

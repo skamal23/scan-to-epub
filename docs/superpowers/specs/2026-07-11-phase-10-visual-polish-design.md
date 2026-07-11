@@ -72,7 +72,7 @@ The scanner is the cinematic moment. It uses the real camera or dark fixture pre
 
 ### Search and confirmation
 
-Manual search uses one clear form surface. Candidate cards use the cover as the visual anchor, align metadata to a stable vertical rhythm, and make the match rationale supportive rather than dominant. The confirmation prompt is simply “Is this your book?” with one card or a small choice set, an obvious reject/scan-again action, and no catalog explanation unless recovery is needed.
+Manual search uses one clear form surface. Candidate cards use the cover as the visual anchor and align title, author, and physical-edition context to a stable vertical rhythm. The confirmation prompt is simply “Is this your book?” with one card or a small choice set, an obvious reject/scan-again action, and no matching-algorithm, catalog, or process explanation unless recovery is needed.
 
 ### Edition result and provenance
 
