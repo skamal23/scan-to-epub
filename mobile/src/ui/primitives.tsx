@@ -7,6 +7,8 @@ import {
   View,
 } from 'react-native';
 
+import { motion } from './theme';
+
 type ButtonProps = {
   label: string;
   onPress(): void;
@@ -18,7 +20,11 @@ export function PrimaryButton({ label, onPress }: ButtonProps) {
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
-      style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.primaryButton,
+        pressed && styles.pressed,
+        { transform: [{ scale: pressed ? motion.pressScale : 1 }] },
+      ]}
     >
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
@@ -46,6 +52,7 @@ export function SecondaryButton({
         appearance === 'onDark' && styles.secondaryButtonOnDark,
         compact && styles.compactButton,
         pressed && styles.pressed,
+        { transform: [{ scale: pressed ? motion.pressScale : 1 }] },
       ]}
     >
       <Text

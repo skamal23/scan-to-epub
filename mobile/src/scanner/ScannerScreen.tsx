@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAccessibilityAnnouncement } from '../accessibility/useAccessibilityAnnouncement';
 import type { CoverClient, CoverRecognitionResult } from '../api/cover';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
+import { motion } from '../ui/theme';
 import { cleanupCoverFiles, prepareCoverPhoto } from './coverCapture';
 import { hasFreshISBN, initialScannerState, scannerReducer } from './scannerState';
 
@@ -387,6 +388,7 @@ export function ScannerView({
           style={({ pressed }) => [
             styles.shutterOuter,
             pressed && styles.pressed,
+            { transform: [{ scale: pressed ? motion.pressScale : 1 }] },
             scanner.locked && styles.disabled,
           ]}
         >
@@ -508,7 +510,11 @@ function PermissionScreen({
             accessibilityLabel={primaryAction.label}
             accessibilityRole="button"
             onPress={primaryAction.onPress}
-            style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}
+            style={({ pressed }) => [
+              styles.primaryAction,
+              pressed && styles.pressed,
+              { transform: [{ scale: pressed ? motion.pressScale : 1 }] },
+            ]}
           >
             <Text style={styles.primaryActionText}>{primaryAction.label}</Text>
           </Pressable>
