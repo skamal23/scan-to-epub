@@ -1,6 +1,14 @@
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Text } from 'react-native';
+import { StyleSheet, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { SafeAreaView } from 'react-native-safe-area-context';
+
+type MockEntranceProps = {
+  children: React.ReactNode;
+  delay?: number;
+};
+
+const mockEntrance = jest.fn(({ children }: MockEntranceProps) => children);
 
 jest.mock('expo-camera', () => {
   const React = require('react');
@@ -14,11 +22,24 @@ jest.mock('expo-camera', () => {
   };
 });
 
+jest.mock('../../ui/Entrance', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    Entrance: (props: MockEntranceProps) => React.createElement(
+      View,
+      { testID: 'entrance' },
+      mockEntrance(props),
+    ),
+  };
+});
+
 import {
   ScannerScreen,
   ScannerView,
   type CameraPermissionState,
 } from '../ScannerScreen';
+import { colors } from '../../ui/theme';
 
 const granted: CameraPermissionState = {
   granted: true,
@@ -154,6 +175,72 @@ describe('<ScannerView />', () => {
 
     expect(captureCover).toHaveBeenCalledTimes(1);
     expect(baseProps.onIsbnAccepted).not.toHaveBeenCalled();
+  });
+
+  test('uses the scanner base token for the camera fallback root', () => {
+    const view = render(<ScannerView {...baseProps} permission={granted} />);
+
+    try {
+      const scannerRoot = view.UNSAFE_getByType(SafeAreaView);
+
+      expect(StyleSheet.flatten(scannerRoot.props.style).backgroundColor).toBe(colors.scannerBase);
+    } finally {
+      view.unmount();
+    }
+  });
+
+  test('does not delay static scanner guide readiness', () => {
+    const view = render(<ScannerView {...baseProps} permission={granted} />);
+
+    try {
+      expect(mockEntrance.mock.calls.map(([props]) => props.delay)).toEqual([undefined, undefined]);
+    } finally {
+      view.unmount();
+    }
+  });
+
+  test('keeps Back outside animated scanner content', () => {
+    const view = render(<ScannerView {...baseProps} permission={granted} />);
+
+    try {
+      for (const entrance of view.getAllByTestId('entrance')) {
+        expect(entrance.findAllByProps({ accessibilityLabel: 'Back' })).toHaveLength(0);
+      }
+    } finally {
+      view.unmount();
+    }
+  });
+
+  test('keeps the guide and capture action available for normal and fixture cameras', () => {
+    const normal = render(
+      <ScannerScreen
+        onBack={jest.fn()}
+        onCoverRecognized={jest.fn()}
+        onIsbnAccepted={jest.fn()}
+        onManualSearch={jest.fn()}
+      />,
+    );
+    const fixture = render(
+      <ScannerScreen
+        fixture={{ permission: granted }}
+        onBack={jest.fn()}
+        onCoverRecognized={jest.fn()}
+        onIsbnAccepted={jest.fn()}
+        onManualSearch={jest.fn()}
+      />,
+    );
+
+    try {
+      for (const view of [normal, fixture]) {
+        expect(view.getByLabelText('Book scan guide')).toBeTruthy();
+        expect(
+          view.getByRole('button', { name: 'Capture cover or detected ISBN' }),
+        ).toBeTruthy();
+      }
+    } finally {
+      normal.unmount();
+      fixture.unmount();
+    }
   });
 
   test('marks scanner guidance as a polite live status', () => {

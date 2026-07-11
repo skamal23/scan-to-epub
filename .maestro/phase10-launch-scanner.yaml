@@ -1,0 +1,17 @@
+appId: host.exp.Exponent
+name: Phase 10 launch and scanner visuals
+---
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- takeScreenshot: .maestro/artifacts/phase10-launch
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Invalid ISBN
+    direction: DOWN
+- tapOn: Invalid ISBN
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- takeScreenshot: .maestro/artifacts/phase10-scanner

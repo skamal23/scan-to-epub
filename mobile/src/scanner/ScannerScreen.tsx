@@ -15,8 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useAccessibilityAnnouncement } from '../accessibility/useAccessibilityAnnouncement';
 import type { CoverClient, CoverRecognitionResult } from '../api/cover';
+import { Entrance } from '../ui/Entrance';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
-import { motion } from '../ui/theme';
+import { colors, motion, radius, spacing, type } from '../ui/theme';
 import { cleanupCoverFiles, prepareCoverPhoto } from './coverCapture';
 import { hasFreshISBN, initialScannerState, scannerReducer } from './scannerState';
 
@@ -360,15 +361,21 @@ export function ScannerView({
       <View style={styles.scrim} pointerEvents="none" />
       <View style={styles.header}>
         <SecondaryButton appearance="onDark" compact label="Back" onPress={onBack} />
-        <Text style={styles.title}>Scan a cover or ISBN</Text>
-        <Text style={styles.hint}>The barcode on the back is fastest.</Text>
+        <Entrance>
+          <View style={styles.headerCopy}>
+            <Text style={styles.title}>Scan a cover or ISBN</Text>
+            <Text style={styles.hint}>The barcode on the back is fastest.</Text>
+          </View>
+        </Entrance>
       </View>
-      <View accessible accessibilityLabel="Book scan guide" style={styles.scanGuide}>
-        <View style={[styles.corner, styles.topLeft]} />
-        <View style={[styles.corner, styles.topRight]} />
-        <View style={[styles.corner, styles.bottomLeft]} />
-        <View style={[styles.corner, styles.bottomRight]} />
-      </View>
+      <Entrance>
+        <View accessible accessibilityLabel="Book scan guide" style={styles.scanGuide}>
+          <View style={[styles.corner, styles.topLeft]} />
+          <View style={[styles.corner, styles.topRight]} />
+          <View style={[styles.corner, styles.bottomLeft]} />
+          <View style={[styles.corner, styles.bottomRight]} />
+        </View>
+      </Entrance>
       <View style={styles.controls}>
         <Text accessibilityLiveRegion="polite" accessibilityRole="text" style={styles.message}>
           {scanner.message}
@@ -526,60 +533,78 @@ function PermissionScreen({
 }
 
 const styles = StyleSheet.create({
-  permissionScreen: { backgroundColor: '#F4F1EA', flex: 1 },
-  permissionContent: { flex: 1, gap: 18, justifyContent: 'center', padding: 28 },
-  coverStateContent: { flex: 1, gap: 18, justifyContent: 'center', padding: 28 },
-  permissionCopy: { gap: 10, marginVertical: 8 },
-  permissionTitle: { color: '#1D241F', fontSize: 32, fontWeight: '700' },
-  permissionBody: { color: '#575750', fontSize: 17, lineHeight: 24 },
+  permissionScreen: { backgroundColor: colors.canvas, flex: 1 },
+  permissionContent: { flex: 1, gap: spacing.lg, justifyContent: 'center', padding: spacing.xl },
+  coverStateContent: { flex: 1, gap: spacing.lg, justifyContent: 'center', padding: spacing.xl },
+  permissionCopy: { gap: spacing.sm, marginVertical: spacing.sm },
+  permissionTitle: { color: colors.ink, fontSize: type.title, fontWeight: '700' },
+  permissionBody: { color: colors.mutedInk, fontSize: type.body, lineHeight: 24 },
   primaryAction: {
     alignItems: 'center',
-    backgroundColor: '#24342B',
-    borderRadius: 14,
+    backgroundColor: colors.evergreen,
+    borderRadius: radius.control,
     justifyContent: 'center',
-    minHeight: 52,
-    paddingHorizontal: 20,
+    minHeight: 56,
+    paddingHorizontal: spacing.xl,
   },
   primaryActionText: { color: '#FFFFFF', fontSize: 17, fontWeight: '600' },
-  scannerScreen: { backgroundColor: '#111713', flex: 1, overflow: 'hidden' },
-  fixtureCamera: { backgroundColor: '#18231D', flex: 1 },
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(5, 10, 7, 0.35)' },
-  header: { gap: 10, padding: 24 },
-  title: { color: '#FFFFFF', fontSize: 24, fontWeight: '600' },
-  hint: { color: '#C3CBC6', fontSize: 15 },
+  scannerScreen: { backgroundColor: colors.scannerBase, flex: 1, overflow: 'hidden' },
+  fixtureCamera: { backgroundColor: colors.scannerBase, flex: 1 },
+  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(4, 10, 7, 0.3)' },
+  header: {
+    backgroundColor: 'rgba(8, 14, 10, 0.56)',
+    gap: spacing.sm,
+    paddingBottom: spacing.md,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+  },
+  headerCopy: { gap: spacing.sm },
+  title: { color: '#FFFFFF', fontSize: type.title, fontWeight: '600', lineHeight: 40 },
+  hint: { color: colors.evergreenSoft, fontSize: type.metadata, lineHeight: 20 },
   scanGuide: {
     alignSelf: 'center',
     aspectRatio: 2 / 3,
-    marginVertical: 12,
+    borderColor: 'rgba(246, 243, 236, 0.18)',
+    borderRadius: radius.card,
+    borderWidth: 1,
+    marginVertical: spacing.md,
     maxHeight: 420,
     width: '64%',
   },
-  corner: { borderColor: '#F5F0E5', height: 38, position: 'absolute', width: 38 },
+  corner: { borderColor: colors.canvas, height: 38, position: 'absolute', width: 38 },
   topLeft: { borderLeftWidth: 3, borderTopWidth: 3, left: 0, top: 0 },
   topRight: { borderRightWidth: 3, borderTopWidth: 3, right: 0, top: 0 },
   bottomLeft: { borderBottomWidth: 3, borderLeftWidth: 3, bottom: 0, left: 0 },
   bottomRight: { borderBottomWidth: 3, borderRightWidth: 3, bottom: 0, right: 0 },
-  controls: { gap: 14, padding: 24 },
+  controls: {
+    backgroundColor: 'rgba(8, 14, 10, 0.7)',
+    borderTopColor: 'rgba(246, 243, 236, 0.12)',
+    borderTopWidth: 1,
+    gap: spacing.md,
+    paddingBottom: spacing.xl,
+    paddingHorizontal: spacing.xl,
+    paddingTop: spacing.lg,
+  },
   message: { color: '#FFFFFF', fontSize: 15, minHeight: 20, textAlign: 'center' },
   shutterOuter: {
     alignItems: 'center',
     alignSelf: 'center',
     borderColor: '#FFFFFF',
-    borderRadius: 40,
-    borderWidth: 3,
-    height: 72,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    height: 56,
     justifyContent: 'center',
-    width: 72,
+    width: 56,
   },
-  shutterInner: { backgroundColor: '#FFFFFF', borderRadius: 29, height: 56, width: 56 },
+  shutterInner: { backgroundColor: '#FFFFFF', borderRadius: radius.pill, height: 42, width: 42 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.45 },
-  privacyHint: { color: '#C3CBC6', fontSize: 12, lineHeight: 17, textAlign: 'center' },
+  privacyHint: { color: colors.evergreenSoft, fontSize: type.eyebrow, lineHeight: 17, textAlign: 'center' },
   progressTrack: {
-    backgroundColor: '#D9D8D0',
+    backgroundColor: colors.line,
     borderRadius: 3,
     height: 6,
     overflow: 'hidden',
   },
-  progressFill: { backgroundColor: '#24342B', borderRadius: 3, height: 6 },
+  progressFill: { backgroundColor: colors.evergreen, borderRadius: 3, height: 6 },
 });

@@ -45,6 +45,8 @@ import {
   SecondaryButton,
   StatusMessage,
 } from './src/ui/primitives';
+import { Entrance } from './src/ui/Entrance';
+import { colors, radius, spacing, type } from './src/ui/theme';
 import { useReducedMotionStatus } from './src/ui/useReducedMotion';
 
 export type AppProps = {
@@ -421,40 +423,75 @@ export default function App({
     <SafeAreaView style={styles.screen}>
       <StatusBar style="dark" />
       <View style={styles.content}>
-        <Text style={styles.eyebrow}>RIGHTS-AWARE READING</Text>
-        <Text style={styles.title}>Book to EPUB</Text>
-        <Text style={styles.body}>
-          Identify a physical book and find a verified open edition.
-        </Text>
-        <StatusMessage tone={statusTone} text={state.message} />
-        <View style={styles.buttonStack}>
-          <PrimaryButton
-            label="Open scanner"
-            onPress={() => {
-              setScannerFixture(undefined);
-              dispatch({ type: 'showScanner' });
-            }}
-          />
-          {state.connectivity === 'offline' ? (
-            <SecondaryButton label="Retry connection" onPress={() => void checkHealth()} />
-          ) : null}
-          {showScenarioLauncher ? (
-            <SecondaryButton
-              label="Test scenarios"
-              onPress={() => dispatch({ type: 'showScenarios' })}
-            />
-          ) : null}
-        </View>
+        <Entrance>
+          <View style={styles.launchStack}>
+            <View style={styles.launchCopy}>
+              <Text style={styles.eyebrow}>RIGHTS-AWARE READING</Text>
+              <Text style={styles.title}>Book to EPUB</Text>
+              <Text style={styles.body}>
+                Identify a physical book and find a verified open edition.
+              </Text>
+            </View>
+            <View style={styles.connectionRow}>
+              <StatusMessage tone={statusTone} text={state.message} />
+            </View>
+            <View style={styles.buttonStack}>
+              <PrimaryButton
+                label="Open scanner"
+                onPress={() => {
+                  setScannerFixture(undefined);
+                  dispatch({ type: 'showScanner' });
+                }}
+              />
+              {state.connectivity === 'offline' ? (
+                <SecondaryButton label="Retry connection" onPress={() => void checkHealth()} />
+              ) : null}
+              {showScenarioLauncher ? (
+                <SecondaryButton
+                  label="Test scenarios"
+                  onPress={() => dispatch({ type: 'showScenarios' })}
+                />
+              ) : null}
+            </View>
+          </View>
+        </Entrance>
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F4F1EA', flex: 1 },
-  content: { flex: 1, gap: 20, justifyContent: 'center', padding: 28 },
-  eyebrow: { color: '#68756D', fontSize: 12, fontWeight: '700', letterSpacing: 1.4 },
-  title: { color: '#1D241F', fontSize: 40, fontWeight: '700', letterSpacing: -1.2 },
-  body: { color: '#575750', fontSize: 18, lineHeight: 26, maxWidth: 330 },
-  buttonStack: { gap: 12, marginTop: 12 },
+  screen: { backgroundColor: colors.canvas, flex: 1 },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
+  },
+  launchStack: { gap: spacing.xl },
+  launchCopy: { gap: spacing.md },
+  eyebrow: {
+    color: colors.evergreen,
+    fontSize: type.eyebrow,
+    fontWeight: '700',
+    letterSpacing: 1.6,
+  },
+  title: {
+    color: colors.ink,
+    fontSize: type.display,
+    fontWeight: '700',
+    letterSpacing: -1.2,
+    lineHeight: 46,
+  },
+  body: { color: colors.mutedInk, fontSize: type.body, lineHeight: 25, maxWidth: 340 },
+  connectionRow: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  buttonStack: { gap: spacing.md, marginTop: spacing.sm },
 });

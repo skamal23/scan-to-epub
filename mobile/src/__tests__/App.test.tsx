@@ -1,5 +1,6 @@
 import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
-import { AccessibilityInfo, Keyboard, Text } from 'react-native';
+import { AccessibilityInfo, Keyboard, StyleSheet, Text } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 jest.mock('expo-camera', () => {
   const React = require('react');
@@ -19,6 +20,10 @@ jest.mock('expo-haptics', () => ({
   notificationAsync: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock('../ui/Entrance', () => ({
+  Entrance: ({ children }: { children: React.ReactNode }) => children,
+}));
+
 import App from '../../App';
 import type { BackendClient } from '../api/health';
 import type {
@@ -36,6 +41,7 @@ import {
   readyEditionScenario,
 } from '../dev/editionScenarios';
 import { useReducedMotionStatus } from '../ui/useReducedMotion';
+import { colors } from '../ui/theme';
 
 function MotionStatusProbe() {
   const { isReady, reducedMotion } = useReducedMotionStatus();
@@ -132,6 +138,19 @@ describe('<App />', () => {
     } finally {
       screen?.unmount();
       app.unmount();
+    }
+  });
+
+  test('uses the editorial canvas token for the launch root', async () => {
+    const view = render(<App client={healthyClient()} showScenarioLauncher={false} />);
+
+    try {
+      await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+      const launchRoot = view.UNSAFE_getByType(SafeAreaView);
+
+      expect(StyleSheet.flatten(launchRoot.props.style).backgroundColor).toBe(colors.canvas);
+    } finally {
+      view.unmount();
     }
   });
 
