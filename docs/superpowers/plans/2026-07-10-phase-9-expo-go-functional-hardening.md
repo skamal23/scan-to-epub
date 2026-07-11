@@ -35,7 +35,7 @@
 - Consumes: `create_app(Settings(...))` from `book_backend.app` and the existing `/health` and `/covers/recognize` routes.
 - Produces: privacy-safe response headers on every route, an internally generated request identifier, deterministic 400/413 cover-upload failures rather than unhandled parsing errors, and launch commands that do not let Uvicorn log request targets.
 
-- [ ] **Step 1: Write the failing request-boundary tests**
+- [x] **Step 1: Write the failing request-boundary tests**
 
 ```python
 @pytest.mark.anyio
@@ -87,13 +87,13 @@ def test_backend_launch_commands_disable_uvicorn_access_logging():
     ).read_text()
 ```
 
-- [ ] **Step 2: Run the new tests to verify they fail**
+- [x] **Step 2: Run the new tests to verify they fail**
 
 Run: `.venv/bin/python -m pytest backend/tests/test_request_boundary.py -q`
 
 Expected: failures because the middleware currently reflects a supplied request identifier, emits no privacy headers, accepts signed `Content-Length` values, and the launch commands leave Uvicorn access logging enabled.
 
-- [ ] **Step 3: Implement the smallest safe middleware and header parser**
+- [x] **Step 3: Implement the smallest safe middleware and header parser**
 
 ```python
 def _cover_content_length(request: Request) -> int | None:
@@ -123,17 +123,17 @@ Use `_cover_content_length(request)` in `recognize_cover` before streaming. Keep
 
 Add `--no-access-log` to all four Uvicorn Make targets and to `render.yaml`'s `startCommand`; the application logger already records only method, path, and status.
 
-- [ ] **Step 4: Run the focused backend checks**
+- [x] **Step 4: Run the focused backend checks**
 
 Run: `.venv/bin/python -m pytest backend/tests/test_request_boundary.py backend/tests/test_cover_api.py backend/tests/test_health.py -q && .venv/bin/python -m ruff check backend && .venv/bin/python -m ruff format --check backend`
 
 Expected: all selected tests pass with no Ruff violations.
 
-- [ ] **Step 5: Document the local-vs-public boundary**
+- [x] **Step 5: Document the local-vs-public boundary**
 
 Add one short README sentence beside the phone workflow stating that the response privacy headers apply to the local demo too, while HTTPS enforcement is a hosted-deployment concern and must not be bypassed for a public service.
 
-- [ ] **Step 6: Commit the isolated task**
+- [x] **Step 6: Commit the isolated task**
 
 ```bash
 git add backend/src/book_backend/app.py backend/tests/test_request_boundary.py Makefile render.yaml README.md
@@ -157,7 +157,7 @@ git commit -m "feat: harden backend request boundary"
 - Consumes: React Native `AccessibilityInfo.announceForAccessibility`, the existing scanner state message, and `EditionState`/`ExportState` labels.
 - Produces: `useAccessibilityAnnouncement(message: string | null | undefined): void`, used once per meaningful state message without duplicate announcements on ordinary rerenders.
 
-- [ ] **Step 1: Write the hook test first**
+- [x] **Step 1: Write the hook test first**
 
 ```tsx
 function Probe({ message }: { message: string | null }) {
@@ -177,13 +177,13 @@ test('announces each nonempty state message once', () => {
 });
 ```
 
-- [ ] **Step 2: Verify the hook test fails**
+- [x] **Step 2: Verify the hook test fails**
 
 Run: `cd mobile && pnpm test -- useAccessibilityAnnouncement.test.tsx`
 
 Expected: module-not-found failure before the hook exists.
 
-- [ ] **Step 3: Implement the hook without adding an animation or timer**
+- [x] **Step 3: Implement the hook without adding an animation or timer**
 
 ```tsx
 import { AccessibilityInfo } from 'react-native';
@@ -199,21 +199,21 @@ export function useAccessibilityAnnouncement(message: string | null | undefined)
 }
 ```
 
-- [ ] **Step 4: Wire only meaningful state transitions**
+- [x] **Step 4: Wire only meaningful state transitions**
 
 In `EditionResolutionFlow.tsx`, announce the searching label, an unavailable/error message, the ready title, and export status/error copy. In `ScannerScreen.tsx`, announce scanner messages only when the reducer state changes. Add `accessibilityLiveRegion="polite"` to visible state-message containers as an Android-compatible fallback, and set `accessibilityRole="alert"` on error/unavailable message bodies. Do not announce static labels, provenance rows, or every render.
 
-- [ ] **Step 5: Add screen-level semantics tests**
+- [x] **Step 5: Add screen-level semantics tests**
 
 Extend the existing tests to assert that a refusal message has the alert role and the ready/export status has a polite live region. Keep assertions on user-visible labels rather than implementation class names.
 
-- [ ] **Step 6: Run focused mobile verification**
+- [x] **Step 6: Run focused mobile verification**
 
 Run: `cd mobile && pnpm test -- useAccessibilityAnnouncement.test.tsx EditionResolutionFlow.test.tsx ScannerScreen.test.tsx && pnpm typecheck`
 
 Expected: all selected suites pass and TypeScript reports no errors.
 
-- [ ] **Step 7: Commit the isolated task**
+- [x] **Step 7: Commit the isolated task**
 
 ```bash
 git add mobile/src/accessibility mobile/src/screens/EditionResolutionFlow.tsx mobile/src/scanner/ScannerScreen.tsx mobile/src/ui/primitives.tsx mobile/src/screens/__tests__ mobile/src/scanner/__tests__

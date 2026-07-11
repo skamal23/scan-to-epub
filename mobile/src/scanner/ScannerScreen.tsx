@@ -13,6 +13,7 @@ import { manipulateAsync, SaveFormat } from 'expo-image-manipulator';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAccessibilityAnnouncement } from '../accessibility/useAccessibilityAnnouncement';
 import type { CoverClient, CoverRecognitionResult } from '../api/cover';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { cleanupCoverFiles, prepareCoverPhoto } from './coverCapture';
@@ -79,6 +80,14 @@ export function ScannerScreen({
   const fixtureNow = fixture
     ? () => (fixture.observations?.at(-1)?.at ?? 0) + 100
     : undefined;
+
+  useAccessibilityAnnouncement(
+    coverState.status === 'processing'
+      ? coverState.stage
+      : coverState.status === 'error'
+        ? `Could not identify this cover. ${coverState.message}`
+        : null,
+  );
 
   useEffect(() => {
     mounted.current = true;
@@ -274,6 +283,7 @@ export function ScannerView({
   acceptedHandler.current = onIsbnAccepted;
   feedbackHandler.current = feedback;
   captureDelay.current = captureDelayMs;
+  useAccessibilityAnnouncement(scannerAnnouncement(permission, scanner.message));
 
   useEffect(() => {
     for (const observation of scriptedObservations ?? []) {
@@ -320,6 +330,7 @@ export function ScannerView({
               onPress: onRequestPermission,
             }
           : { label: 'Open Settings', onPress: onOpenSettings }}
+        isRecovery={!undetermined}
         onBack={onBack}
         onManualSearch={onManualSearch}
       />
@@ -358,7 +369,9 @@ export function ScannerView({
         <View style={[styles.corner, styles.bottomRight]} />
       </View>
       <View style={styles.controls}>
-        <Text accessibilityRole="text" style={styles.message}>{scanner.message}</Text>
+        <Text accessibilityLiveRegion="polite" accessibilityRole="text" style={styles.message}>
+          {scanner.message}
+        </Text>
         <Pressable
           accessibilityLabel="Capture cover or detected ISBN"
           accessibilityRole="button"
@@ -392,6 +405,21 @@ export function ScannerView({
   );
 }
 
+function scannerAnnouncement(
+  permission: CameraPermissionState | null,
+  scannerMessage: string,
+): string {
+  if (!permission) return 'Preparing camera. Checking camera access.';
+  if (permission.granted) return scannerMessage;
+  if (permission.status === 'undetermined') {
+    return 'Camera access is used only to recognize a book cover or ISBN barcode.';
+  }
+  if (permission.canAskAgain) {
+    return 'Camera access is off. Allow camera access to scan a barcode, or search manually.';
+  }
+  return 'Camera access is blocked. Enable camera access in Settings, or search manually.';
+}
+
 function CoverMessageScreen({
   title,
   body,
@@ -409,7 +437,7 @@ function CoverMessageScreen({
     <SafeAreaView style={styles.permissionScreen}>
       <StatusBar style="dark" />
       <View style={styles.coverStateContent}>
-        <Text style={styles.permissionTitle}>{title}</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.permissionTitle}>{title}</Text>
         <Text style={styles.permissionBody}>{body}</Text>
         <View accessibilityLabel="Cover upload progress" style={styles.progressTrack}>
           <View style={[styles.progressFill, { width: `${Math.max(8, progress * 100)}%` }]} />
@@ -434,7 +462,9 @@ function CoverRecoveryScreen({
       <StatusBar style="dark" />
       <View style={styles.coverStateContent}>
         <Text style={styles.permissionTitle}>Couldn’t identify this cover</Text>
-        <Text style={styles.permissionBody}>{message}</Text>
+        <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.permissionBody}>
+          {message}
+        </Text>
         <PrimaryButton label="Try another cover" onPress={onScanAgain} />
         <SecondaryButton label="Scan the back barcode" onPress={onScanAgain} />
         <SecondaryButton label="Enter title manually" onPress={onManualSearch} />
@@ -447,12 +477,14 @@ function PermissionScreen({
   title,
   body,
   primaryAction,
+  isRecovery = false,
   onBack,
   onManualSearch,
 }: {
   title: string;
   body: string;
   primaryAction?: { label: string; onPress(): void };
+  isRecovery?: boolean;
   onBack(): void;
   onManualSearch(): void;
 }) {
@@ -463,7 +495,13 @@ function PermissionScreen({
         <SecondaryButton compact label="Back" onPress={onBack} />
         <View style={styles.permissionCopy}>
           <Text style={styles.permissionTitle}>{title}</Text>
-          <Text style={styles.permissionBody}>{body}</Text>
+          <Text
+            accessibilityLiveRegion={isRecovery ? 'assertive' : 'polite'}
+            accessibilityRole={isRecovery ? 'alert' : 'text'}
+            style={styles.permissionBody}
+          >
+            {body}
+          </Text>
         </View>
         {primaryAction ? (
           <Pressable

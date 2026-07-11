@@ -82,6 +82,19 @@ describe('<ScannerView />', () => {
     expect(baseProps.onOpenSettings).toHaveBeenCalledTimes(1);
   });
 
+  test('announces blocked camera recovery as an accessible alert', () => {
+    const view = render(
+      <ScannerView
+        {...baseProps}
+        permission={{ granted: false, status: 'denied', canAskAgain: false }}
+      />,
+    );
+
+    expect(view.getByRole('alert')).toHaveTextContent(
+      'Enable camera access in Settings, or search manually.',
+    );
+  });
+
   test('freezes and accepts a stable repeated ISBN observation', async () => {
     const accepted = jest.fn();
     const feedback = jest.fn().mockResolvedValue(undefined);
@@ -141,6 +154,15 @@ describe('<ScannerView />', () => {
 
     expect(captureCover).toHaveBeenCalledTimes(1);
     expect(baseProps.onIsbnAccepted).not.toHaveBeenCalled();
+  });
+
+  test('marks scanner guidance as a polite live status', () => {
+    const view = render(<ScannerView {...baseProps} permission={granted} />);
+
+    expect(
+      view.getByText('Frame the front cover, or show the back barcode.').props
+        .accessibilityLiveRegion,
+    ).toBe('polite');
   });
 
   test('does not replay default success feedback after a parent rerender', async () => {

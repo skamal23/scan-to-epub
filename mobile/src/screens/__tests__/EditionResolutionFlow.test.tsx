@@ -1,4 +1,5 @@
 import { fireEvent, render } from '@testing-library/react-native';
+import { AccessibilityInfo } from 'react-native';
 
 import type { EditionResolutionResult } from '../../api/editions';
 import { metadataScenarios } from '../../dev/metadataScenarios';
@@ -62,11 +63,48 @@ test('searching state preserves the confirmed physical edition', () => {
   expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
 });
 
+
+test('marks changing edition states for assistive technologies', () => {
+  const searching = render(
+    <EditionResolutionFlow
+      {...props}
+      state={{ status: 'searching', result: null, message: null }}
+    />,
+  );
+
+  expect(
+    searching.getByText('Checking reviewed sources and analyzing a PDF safely where needed…')
+      .props.accessibilityLiveRegion,
+  ).toBe('polite');
+  searching.unmount();
+
+  const unavailable: EditionState = {
+    status: 'resolved',
+    message: null,
+    result: {
+      status: 'unavailable',
+      reason: 'No reviewed open edition is available for this work yet.',
+      physicalEdition: null,
+      digitalEdition: null,
+      source: null,
+      rights: null,
+      provenance: null,
+      delivery: null,
+    },
+  };
+  const refusal = render(<EditionResolutionFlow {...props} state={unavailable} />);
+
+  expect(refusal.getByRole('alert')).toHaveTextContent(
+    'No reviewed open edition is available for this work yet.',
+  );
+});
+
 test('ready state shows verified digital edition and auditable rights details', () => {
   const state: EditionState = { status: 'resolved', result: ready, message: null };
   const view = render(<EditionResolutionFlow {...props} state={state} />);
 
   expect(view.getByText('Verified open edition')).toBeTruthy();
+  expect(view.getByText('Pride and Prejudice').props.accessibilityLiveRegion).toBe('polite');
   expect(view.getByText('Standard Ebooks')).toBeTruthy();
   expect(view.getByText(/may differ from your physical copy/i)).toBeTruthy();
   fireEvent.press(view.getByRole('button', { name: 'Open in Books' }));
@@ -80,6 +118,24 @@ test('ready state shows verified digital edition and auditable rights details', 
   expect(view.getByText('2026-07-10T18:00:00Z')).toBeTruthy();
   expect(view.getByText(`SHA-256 ${'a'.repeat(12)}…`)).toBeTruthy();
   expect(view.getByText('Jane Austen, public domain.')).toBeTruthy();
+});
+
+
+test('announces the actual ready edition title', () => {
+  const announce = jest
+    .spyOn(AccessibilityInfo, 'announceForAccessibility')
+    .mockImplementation(() => undefined);
+  announce.mockClear();
+
+  render(
+    <EditionResolutionFlow
+      {...props}
+      state={{ status: 'resolved', result: ready, message: null }}
+    />,
+  );
+
+  expect(announce).toHaveBeenCalledWith('Pride and Prejudice is ready.');
+  announce.mockRestore();
 });
 
 
@@ -163,9 +219,38 @@ test('shows download progress and lets the user cancel without leaving the confi
   const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
 
   expect(view.getByText('Downloading verified EPUB')).toBeTruthy();
+  expect(view.getByText('Downloading verified EPUB').props.accessibilityLiveRegion).toBe('polite');
+  expect(view.getByText('50%').props.accessibilityLiveRegion).toBeUndefined();
   expect(view.getByText('50%')).toBeTruthy();
   fireEvent.press(view.getByRole('button', { name: 'Cancel download' }));
   expect(props.onCancelExport).toHaveBeenCalled();
+});
+
+test('announces that an EPUB is ready again after the share sheet closes', () => {
+  const announce = jest
+    .spyOn(AccessibilityInfo, 'announceForAccessibility')
+    .mockImplementation(() => undefined);
+  announce.mockClear();
+  const exportState: ExportState = {
+    status: 'ready',
+    intent: null,
+    file: null,
+    progress: null,
+    message: 'EPUB is ready to share again.',
+    code: null,
+  };
+
+  const view = render(
+    <EditionResolutionFlow
+      {...props}
+      state={{ status: 'resolved', result: ready, message: null }}
+      exportState={exportState}
+    />,
+  );
+
+  expect(announce).toHaveBeenCalledWith('EPUB is ready to share again.');
+  expect(view.getByText('EPUB is ready to share again.').props.accessibilityLiveRegion).toBe('polite');
+  announce.mockRestore();
 });
 
 test('treats an expired delivery as a recheck of the same confirmed edition', () => {
@@ -176,6 +261,7 @@ test('treats an expired delivery as a recheck of the same confirmed edition', ()
   const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
 
   expect(view.getByText('This download link expired. Check the edition again.')).toBeTruthy();
+  expect(view.getByText('This download link expired. Check the edition again.').props.accessibilityRole).toBe('alert');
   fireEvent.press(view.getByRole('button', { name: 'Check edition again' }));
   expect(props.onRefreshEdition).toHaveBeenCalled();
 });

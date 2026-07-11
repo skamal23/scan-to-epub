@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { useAccessibilityAnnouncement } from '../accessibility/useAccessibilityAnnouncement';
 import type { MetadataCandidate } from '../api/metadata';
 import type { EditionState } from '../state/editionState';
 import type { ExportIntent, ExportState } from '../state/exportState';
@@ -31,6 +32,8 @@ export function EditionResolutionFlow({
   onRetryExport(): void;
   onRefreshEdition(): void;
 }) {
+  useAccessibilityAnnouncement(editionAnnouncement(state, exportState));
+
   if (state.status === 'searching' || state.status === 'idle') {
     return <Searching candidate={candidate} onBack={onBack} />;
   }
@@ -77,6 +80,31 @@ export function EditionResolutionFlow({
   );
 }
 
+function editionAnnouncement(state: EditionState, exportState: ExportState): string | null {
+  if (state.status === 'searching' || state.status === 'idle') {
+    return 'Checking reviewed sources and validating the open edition.';
+  }
+  if (state.status === 'error') {
+    return `Open-edition check unavailable. ${state.message ?? 'Please try the approved source again.'}`;
+  }
+  if (!state.result || state.result.status === 'unavailable') {
+    return `Book identified, open edition unavailable. ${state.result?.reason ?? 'No reviewed open edition is available for this work yet.'}`;
+  }
+  if (exportState.status === 'downloading') {
+    return 'Downloading verified EPUB.';
+  }
+  if (exportState.status === 'sharing') {
+    return 'The iOS share sheet is open.';
+  }
+  if (exportState.status === 'error') {
+    return exportState.message ?? 'The EPUB could not be prepared.';
+  }
+  if (exportState.status === 'ready' && exportState.message) {
+    return exportState.message;
+  }
+  return `${state.result.digitalEdition?.title ?? 'Open edition'} is ready.`;
+}
+
 function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack(): void }) {
   const physical = [candidate.edition.publisher, candidate.edition.publishedDate].filter(Boolean).join(', ');
   return (
@@ -84,7 +112,9 @@ function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack
       <View style={[styles.content, styles.centered]}>
         <Text style={styles.eyebrow}>WORK CONFIRMED</Text>
         <Text style={styles.title}>Work confirmed</Text>
-        <Text style={styles.subtitle}>Checking reviewed sources and analyzing a PDF safely where needed…</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.subtitle}>
+          Checking reviewed sources and analyzing a PDF safely where needed…
+        </Text>
         <Text style={styles.body}>Validating rights, source integrity, PDF layout when applicable, and EPUB conformance.</Text>
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Your physical edition</Text>
@@ -126,7 +156,9 @@ function Ready({
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.eyebrow}>{isGenerated ? 'GENERATED OPEN EDITION' : 'VERIFIED OPEN EDITION'}</Text>
-        <Text style={styles.title}>{isGenerated ? 'Generated open edition' : 'Verified open edition'}</Text>
+        <Text style={styles.title}>
+          {isGenerated ? 'Generated open edition' : 'Verified open edition'}
+        </Text>
         <View style={styles.editionCard}>
           {digital.coverUrl ? (
             <Image source={{ uri: digital.coverUrl }} style={styles.cover} />
@@ -136,7 +168,7 @@ function Ready({
             </View>
           )}
           <View style={styles.editionCopy}>
-            <Text style={styles.editionTitle}>{digital.title}</Text>
+            <Text accessibilityLiveRegion="polite" style={styles.editionTitle}>{digital.title}</Text>
             <Text style={styles.editionAuthor}>{digital.authors.join(', ')}</Text>
             <Text style={styles.source}>{source.organization}</Text>
           </View>
@@ -222,7 +254,7 @@ function ExportActions({
       : `${Math.round(state.progress.fraction * 100)}%`;
     return (
       <View style={styles.exportPanel}>
-        <Text style={styles.exportTitle}>Downloading verified EPUB</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>Downloading verified EPUB</Text>
         <Text style={styles.exportBody}>{percentage}</Text>
         <SecondaryButton label="Cancel download" onPress={onCancel} />
       </View>
@@ -234,17 +266,23 @@ function ExportActions({
       : 'Choose Books in the iOS share sheet.';
     return (
       <View style={styles.exportPanel}>
-        <Text style={styles.exportTitle}>Share sheet open</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>Share sheet open</Text>
         <Text style={styles.exportBody}>{instruction}</Text>
       </View>
     );
   }
   return (
     <View style={styles.exportStack}>
-      {state.message && state.status !== 'error' ? <Text style={styles.exportBody}>{state.message}</Text> : null}
+      {state.message && state.status !== 'error' ? (
+        <Text accessibilityLiveRegion="polite" style={styles.exportBody}>
+          {state.message}
+        </Text>
+      ) : null}
       {state.status === 'error' ? (
         <View style={styles.exportPanel}>
-          <Text style={styles.exportBody}>{state.message ?? 'The EPUB could not be prepared.'}</Text>
+          <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.exportBody}>
+            {state.message ?? 'The EPUB could not be prepared.'}
+          </Text>
           {state.code === 'expired' ? (
             <PrimaryButton label="Check edition again" onPress={onRefreshEdition} />
           ) : (
@@ -278,7 +316,9 @@ function MessageScreen({ title, body, primary, secondary }: {
     <SafeAreaView style={styles.screen}>
       <View style={[styles.content, styles.centered]}>
         <Text style={styles.title}>{title}</Text>
-        <Text style={styles.body}>{body}</Text>
+        <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.body}>
+          {body}
+        </Text>
         <PrimaryButton label={primary.label} onPress={primary.onPress} />
         <SecondaryButton label={secondary.label} onPress={secondary.onPress} />
       </View>

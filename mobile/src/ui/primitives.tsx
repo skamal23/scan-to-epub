@@ -65,7 +65,12 @@ export function StatusMessage({ tone, text }: {
   text: string;
 }) {
   return (
-    <View style={styles.statusRow} accessibilityRole="text">
+    <View
+      accessible
+      accessibilityLiveRegion={tone === 'error' ? 'assertive' : 'polite'}
+      accessibilityRole={tone === 'error' ? 'alert' : 'text'}
+      style={styles.statusRow}
+    >
       <View style={[styles.statusDot, statusTone[tone]]} />
       <Text style={styles.statusText}>{text}</Text>
     </View>
@@ -87,7 +92,7 @@ export function SheetContainer({ children }: { children: ReactNode }) {
 
 export function LoadingIndicator({ label }: { label: string }) {
   return (
-    <View style={styles.loadingRow}>
+    <View accessible accessibilityLiveRegion="polite" style={styles.loadingRow}>
       <ActivityIndicator color="#4F6D5B" />
       <Text style={styles.statusText}>{label}</Text>
     </View>
