@@ -117,7 +117,7 @@ git commit -m "feat: add polished mobile UI foundation"
 - Consumes: Task 1’s tokens, `Entrance`, and existing `PrimaryButton`/`SecondaryButton` APIs.
 - Produces: the same launch/scanner callbacks and test IDs with a consistent editorial launch frame and a cinematic scanner frame.
 
-- [ ] **Step 1: Add failing visual-contract tests**
+- [x] **Step 1: Add failing visual-contract tests**
 
 Add component assertions that the launch root uses `colors.canvas`, the scanner root uses `colors.scannerBase`, the scanner guide keeps `accessibilityLabel="Book scan guide"`, and both normal and fixture camera views expose the same capture action. The token-color assertions must fail against the current `#F4F1EA` / `#111713` literals. Add a Maestro flow that launches Expo Go, opens the scanner fixture, captures screenshots for the launch and scanner states, and asserts the existing labels:
 
@@ -136,23 +136,23 @@ name: Phase 10 launch and scanner visuals
 - takeScreenshot: .maestro/artifacts/phase10-scanner
 ```
 
-- [ ] **Step 2: Run the targeted tests and Maestro flow before visual changes**
+- [x] **Step 2: Run the targeted tests and Maestro flow before visual changes**
 
 Run: `cd mobile && pnpm test -- App.test.tsx ScannerScreen.test.tsx` and `maestro test .maestro/phase10-launch-scanner.yaml`
 
 Expected: existing functional assertions pass; the new explicit visual/semantic assertions identify the unpolished style contracts before Task 2 implementation.
 
-- [ ] **Step 3: Apply the launch and scanner design**
+- [x] **Step 3: Apply the launch and scanner design**
 
 In `App.tsx`, wrap the launch content in `Entrance`, apply the canvas/typography tokens, make the connection row visually compact, retain one dominant scanner action, and leave the dev-only scenario action secondary. In `ScannerScreen.tsx`, use the scanner-base fallback, a more deliberate scrim, tokenized header/control spacing, a 56 pt press-responsive shutter, and the existing book scan guide/capture semantics. Use `Entrance` only for the scanner guide readiness and static screen content—never for barcode processing or control availability.
 
-- [ ] **Step 4: Verify regression safety**
+- [x] **Step 4: Verify regression safety**
 
 Run: `cd mobile && pnpm test -- App.test.tsx ScannerScreen.test.tsx && pnpm typecheck` and `maestro test .maestro/phase10-launch-scanner.yaml`
 
 Expected: launch, manual scanner entry, camera-permission fixture, barcode capture, cover capture, cancellation, and accessibility labels all pass without changed user actions.
 
-- [ ] **Step 5: Commit the vertical slice**
+- [x] **Step 5: Commit the vertical slice**
 
 ```bash
 git add mobile/App.tsx mobile/src/scanner/ScannerScreen.tsx mobile/src/__tests__/App.test.tsx \
