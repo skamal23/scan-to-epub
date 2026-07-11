@@ -37,7 +37,7 @@
 - Consumes: React Native `AccessibilityInfo`, `Animated`, and the existing button primitive API.
 - Produces: `colors`, `spacing`, `radius`, `type`, and `motion` tokens; `useReducedMotion(): boolean`; and `<Entrance children distance? delay? testID?>` for stateful screen/card entrances.
 
-- [ ] **Step 1: Write the failing preference and motion primitive tests**
+- [x] **Step 1: Write the failing preference and motion primitive tests**
 
 ```tsx
 test('uses the current Reduce Motion preference and listens for later changes', async () => {
@@ -60,13 +60,13 @@ test('keeps an Entrance visible without a translate transform when motion is red
 
 Extend the primitives test with a press-state assertion that verifies `PrimaryButton` changes only opacity/transform and keeps the same accessible role and label.
 
-- [ ] **Step 2: Run the focused tests to verify they fail**
+- [x] **Step 2: Run the focused tests to verify they fail**
 
 Run: `cd mobile && pnpm test -- useReducedMotion.test.tsx Entrance.test.tsx primitives.test.tsx`
 
 Expected: module-not-found failures for the new hook and component, plus the new press-style assertion failing against the old opacity-only primitive.
 
-- [ ] **Step 3: Add the smallest reusable foundation**
+- [x] **Step 3: Add the smallest reusable foundation**
 
 Create `theme.ts` with immutable tokens, keeping literals out of new screen styles:
 
@@ -85,13 +85,13 @@ export const motion = { pressScale: 0.975, contentDistance: 8, cardDistance: 12,
 
 Implement `useReducedMotion` with an initial `AccessibilityInfo.isReduceMotionEnabled()` read, the `reduceMotionChanged` subscription, and listener cleanup. Implement `Entrance` with two native-driver `Animated.Value`s for opacity and translateY; when reduced motion is true, render immediately at opacity 1 and translateY 0. Update `PrimaryButton`, `SecondaryButton`, and the scanner-specific button style call sites to use `transform: [{ scale: pressed ? motion.pressScale : 1 }]` together with the current opacity feedback.
 
-- [ ] **Step 4: Run focused mobile verification**
+- [x] **Step 4: Run focused mobile verification**
 
 Run: `cd mobile && pnpm test -- useReducedMotion.test.tsx Entrance.test.tsx primitives.test.tsx && pnpm typecheck`
 
 Expected: all focused tests pass and TypeScript has no errors.
 
-- [ ] **Step 5: Commit the foundation**
+- [x] **Step 5: Commit the foundation**
 
 ```bash
 git add mobile/src/ui/theme.ts mobile/src/ui/useReducedMotion.ts mobile/src/ui/Entrance.tsx \
