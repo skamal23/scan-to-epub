@@ -1,3 +1,6 @@
+import io
+import zipfile
+
 import httpx
 import pytest
 
@@ -33,6 +36,24 @@ def request_body():
         "workSourceIds": {"open_library": "OL66554W"},
         "editionSourceIds": {"open_library": "OL7353617M"},
         "territory": "US",
+    }
+
+
+def generated_fixture_request_body(
+    *,
+    candidate_id: str = "fixture:generated-html",
+    title: str = "Structured Open Text",
+):
+    return {
+        **request_body(),
+        "candidateId": candidate_id,
+        "workTitle": title,
+        "workAuthors": ["Example Author"],
+        "physicalIsbn13": None,
+        "physicalPublisher": "Fixture Press",
+        "physicalPublishedDate": "2026",
+        "workSourceIds": {"fixture": "generated-html"},
+        "editionSourceIds": {"fixture": "generated-html-edition"},
     }
 
 
@@ -101,6 +122,66 @@ async def test_fixture_resolution_provides_a_short_lived_epub_for_simulator_expo
     assert downloaded.status_code == 200
     assert downloaded.headers["x-content-sha256"] == delivery["sha256"]
     assert downloaded.content.startswith(b"PK")
+
+
+@pytest.mark.anyio
+async def test_fixture_mode_generates_and_delivers_a_test_only_structured_epub():
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post("/editions/resolve", json=generated_fixture_request_body())
+
+        assert resolved.status_code == 200
+        assert resolved.json()["status"] == "ready"
+        delivery = resolved.json()["delivery"]
+        downloaded = await client.get(
+            delivery["downloadPath"],
+            headers={"Authorization": f"Bearer {delivery['downloadToken']}"},
+        )
+
+    payload = resolved.json()
+    assert payload["provenance"]["transformation"] == "generated"
+    assert payload["provenance"]["generatorVersion"] == "structured-epub/1"
+    assert payload["provenance"]["retrievedAt"] == "2026-07-10T17:00:00Z"
+    assert payload["provenance"]["generatedAt"] == "2026-07-10T18:00:00Z"
+    assert payload["rights"]["licenseName"] == "Test-only structured source"
+    assert downloaded.status_code == 200
+    with zipfile.ZipFile(io.BytesIO(downloaded.content)) as archive:
+        chapter = archive.read("EPUB/chapter-001.xhtml").decode()
+    assert "This test-only text verifies deterministic EPUB generation." in chapter
+
+
+@pytest.mark.anyio
+async def test_fixture_mode_generates_and_delivers_a_test_only_plain_text_epub():
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post(
+            "/editions/resolve",
+            json=generated_fixture_request_body(
+                candidate_id="fixture:generated-plain-text",
+                title="Structured Plain Text",
+            ),
+        )
+
+        assert resolved.status_code == 200
+        assert resolved.json()["status"] == "ready"
+        delivery = resolved.json()["delivery"]
+        downloaded = await client.get(
+            delivery["downloadPath"],
+            headers={"Authorization": f"Bearer {delivery['downloadToken']}"},
+        )
+
+    payload = resolved.json()
+    assert payload["provenance"]["transformationSteps"] == [
+        "normalized authorized PLAIN_TEXT",
+        "packaged deterministic EPUB",
+    ]
+    with zipfile.ZipFile(io.BytesIO(downloaded.content)) as archive:
+        chapter = archive.read("EPUB/chapter-001.xhtml").decode()
+    assert "This test-only plain-text source verifies deterministic EPUB generation." in chapter
 
 
 @pytest.mark.anyio

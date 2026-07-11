@@ -473,13 +473,13 @@ Optional help selecting representative physical books for the later final demo. 
 
 ### Purpose
 
-Support legal works that lack an existing EPUB but provide clean, rights-cleared HTML, XML, XHTML, or plain text.
+Support legal works that lack a deliverable existing EPUB but provide clean, rights-cleared HTML or plain text.
 
 ### Backend work
 
 - Classify authorized structured sources as eligible or ineligible for generation.
 - Build deterministic source-specific cleanup and chapter-detection behavior.
-- Preserve wording while normalizing encoding, paragraph breaks, headings, emphasis, poetry, links, footnotes, and permitted images.
+- Preserve wording while normalizing encoding, paragraph breaks, headings, emphasis, poetry, links, and footnotes; reject source images and unsupported markup rather than silently simplifying them.
 - Create the EPUB package, navigation, metadata, accessibility information, attribution, license notice, and an original typographic cover when necessary.
 - Record the original source hash, transformation steps, generated file hash, and converter version.
 - Compare source and output text to detect omissions, duplications, reordering, or unintended changes.
@@ -494,7 +494,7 @@ Support legal works that lack an existing EPUB but provide clean, rights-cleared
 
 ### Automated testing
 
-- Golden fixtures for prose, chapters, poetry, footnotes, images, special characters, and plain text.
+- Golden fixtures for prose, chapters, poetry, footnotes, special characters, and plain text, plus explicit refusal fixtures for images and unsupported attributes.
 - Text-integrity tests comparing normalized source and output.
 - EPUBCheck tests for every generated fixture.
 - Attribution, license, navigation, accessibility, and cover metadata tests.
@@ -516,6 +516,7 @@ If no EPUB exists but a legal structured source does, the user sees a slightly l
 - Every generated EPUB passes EPUBCheck.
 - Generated books pass deterministic navigation, link, metadata, and share-flow checks; physical Apple Books reading remains pending until Phase 11.
 - No AI-generated content enters the book.
+- XML/XHTML declaration normalization and source-image reuse remain deferred until they have dedicated structural and per-asset rights rules; the initial generator rejects them safely.
 
 ### User involvement
 

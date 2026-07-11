@@ -84,7 +84,7 @@ function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack
       <View style={[styles.content, styles.centered]}>
         <Text style={styles.eyebrow}>WORK CONFIRMED</Text>
         <Text style={styles.title}>Work confirmed</Text>
-        <Text style={styles.subtitle}>Checking reviewed open editions…</Text>
+        <Text style={styles.subtitle}>Checking reviewed sources and preparing an EPUB where needed…</Text>
         <Text style={styles.body}>Validating rights, source integrity, and EPUB conformance.</Text>
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Your physical edition</Text>
@@ -121,11 +121,12 @@ function Ready({
   const provenance = result.provenance!;
   const physical = result.physicalEdition;
   const physicalPublication = [physical?.publisher, physical?.publishedDate].filter(Boolean).join(', ');
+  const isGenerated = provenance.transformation === 'generated';
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>VERIFIED OPEN EDITION</Text>
-        <Text style={styles.title}>Verified open edition</Text>
+        <Text style={styles.eyebrow}>{isGenerated ? 'GENERATED OPEN EDITION' : 'VERIFIED OPEN EDITION'}</Text>
+        <Text style={styles.title}>{isGenerated ? 'Generated open edition' : 'Verified open edition'}</Text>
         <View style={styles.editionCard}>
           {digital.coverUrl ? (
             <Image source={{ uri: digital.coverUrl }} style={styles.cover} />
@@ -141,11 +142,13 @@ function Ready({
           </View>
         </View>
         <Text style={styles.body}>
-          A legal open edition of this work is available. Its cover, introduction, notes, formatting, or pagination may differ from your physical copy.
+          {isGenerated
+            ? 'A reviewed, rights-cleared source was converted into this EPUB without AI-generated text. Its formatting may differ from your physical copy.'
+            : 'A legal open edition of this work is available. Its cover, introduction, notes, formatting, or pagination may differ from your physical copy.'}
         </Text>
         {provenance.sourceAttempts.length > 1 ? (
           <Text style={styles.sourceFallback}>
-            Checked the next approved source after an earlier edition could not be verified.
+            Checked a later approved path after an earlier option could not be delivered.
           </Text>
         ) : null}
         <View style={styles.infoBox}>
@@ -171,11 +174,26 @@ function Ready({
             <Detail label="License" value={rights.licenseName} />
             {rights.attribution ? <Detail label="Attribution" value={rights.attribution} /> : null}
             <Detail label="Territory" value={rights.territory === 'US' ? 'United States' : rights.territory} />
-            <Detail label="File" value="Passed through unchanged" />
+            <Detail label="File" value={isGenerated ? 'Generated from authorized source' : 'Passed through unchanged'} />
+            {isGenerated ? (
+              <>
+                <Detail label="Converter" value={provenance.generatorVersion ?? 'Deterministic converter'} />
+                <Detail label="Steps" value={provenance.transformationSteps.join(' → ')} />
+              </>
+            ) : null}
             <Detail label="Validation" value={`EPUBCheck ${provenance.epubcheckVersion} · Valid`} />
             <Detail label="Sources checked" value={provenance.sourceAttempts.join(' → ')} />
             <Detail label="Reviewed" value={provenance.catalogReviewedAt} />
-            <Text style={styles.hash}>SHA-256 {provenance.finalSha256.slice(0, 12)}…</Text>
+            <Detail label={isGenerated ? 'Source retrieved' : 'Retrieved'} value={provenance.retrievedAt} />
+            {isGenerated ? <Detail label="Generated" value={provenance.generatedAt ?? 'Conversion time unavailable'} /> : null}
+            {isGenerated ? (
+              <>
+                <Text style={styles.hash}>Source SHA-256 {provenance.originalSha256.slice(0, 12)}…</Text>
+                <Text style={styles.hash}>EPUB SHA-256 {provenance.finalSha256.slice(0, 12)}…</Text>
+              </>
+            ) : (
+              <Text style={styles.hash}>SHA-256 {provenance.finalSha256.slice(0, 12)}…</Text>
+            )}
             <Text style={styles.detailsBody}>{rights.rightsStatement}</Text>
           </View>
         ) : null}

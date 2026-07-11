@@ -1,0 +1,77 @@
+appId: host.exp.Exponent
+name: Phase 7 generated structured EPUB flows
+---
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Generated test EPUB
+    direction: DOWN
+- tapOn: Generated test EPUB
+- assertVisible: Generated open edition
+- assertVisible: Deterministic generated fixture
+- assertVisible: No reusable source cover
+- assertVisible: ".*converted into this EPUB without AI-generated text.*"
+- scrollUntilVisible:
+    element:
+      text: Why this edition is available
+    direction: DOWN
+- tapOn: Why this edition is available
+- scrollUntilVisible:
+    element:
+      text: Generated from authorized source
+    direction: DOWN
+- assertVisible: Generated from authorized source
+- assertVisible: structured-epub/1
+- assertVisible: "Source SHA-256 .*"
+- assertVisible: "EPUB SHA-256 .*"
+- takeScreenshot: .maestro/artifacts/phase7-html-generated-details
+- scrollUntilVisible:
+    element:
+      text: Open in Books
+    direction: UP
+- tapOn: Open in Books
+- assertVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase7-html-share-sheet
+- tapOn:
+    point: 50%, 20%
+- assertVisible: EPUB is ready to share again.
+- scrollUntilVisible:
+    element:
+      text: Scan another book
+    direction: DOWN
+- tapOn: Scan another book
+- assertVisible: Scan a cover or ISBN
+- tapOn: Back
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Generated plain-text EPUB
+    direction: DOWN
+- tapOn: Generated plain-text EPUB
+- assertVisible: Generated open edition
+- assertVisible: "Structured Plain Text \\(test export\\)"
+- scrollUntilVisible:
+    element:
+      text: Why this edition is available
+    direction: DOWN
+- tapOn: Why this edition is available
+- scrollUntilVisible:
+    element:
+      text: ".*normalized authorized PLAIN_TEXT.*"
+    direction: DOWN
+- assertVisible: ".*normalized authorized PLAIN_TEXT.*"
+- takeScreenshot: .maestro/artifacts/phase7-plain-text-details
+- scrollUntilVisible:
+    element:
+      text: Open in Books
+    direction: UP
+- tapOn: Open in Books
+- assertVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase7-plain-text-share-sheet
+- tapOn:
+    point: 50%, 20%
+- assertVisible: EPUB is ready to share again.

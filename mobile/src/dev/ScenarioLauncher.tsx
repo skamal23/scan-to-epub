@@ -9,6 +9,8 @@ import { PrimaryButton, SecondaryButton } from '../ui/primitives';
 import { metadataScenarios } from './metadataScenarios';
 import {
   editionScenarioCandidate,
+  generatedEditionScenarioCandidate,
+  generatedPlainTextEditionScenarioCandidate,
   openLicenseFallbackScenario,
   unavailableEditionScenario,
 } from './editionScenarios';
@@ -140,6 +142,14 @@ export function ScenarioLauncher({
           <SecondaryButton
             label="Verified open edition"
             onPress={() => onResolveEdition(editionScenarioCandidate)}
+          />
+          <SecondaryButton
+            label="Generated test EPUB"
+            onPress={() => onResolveEdition(generatedEditionScenarioCandidate)}
+          />
+          <SecondaryButton
+            label="Generated plain-text EPUB"
+            onPress={() => onResolveEdition(generatedPlainTextEditionScenarioCandidate)}
           />
           <SecondaryButton
             label="Open edition unavailable"

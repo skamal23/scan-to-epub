@@ -51,6 +51,9 @@ const readyResult = {
     epubcheckStatus: 'valid',
     epubcheckWarnings: [],
     sourceAttempts: ['Standard Ebooks'],
+    generatedAt: null,
+    generatorVersion: null,
+    transformationSteps: [],
   },
   delivery: {
     downloadPath: '/editions/download',
@@ -104,6 +107,35 @@ test('accepts a verified edition without a reusable source cover', () => {
   };
 
   expect(decodeEditionResolutionResult(noCover).digitalEdition?.coverUrl).toBeNull();
+});
+
+
+test('decodes a generated open edition with its source-to-EPUB provenance', () => {
+  const generated = {
+    ...readyResult,
+    digitalEdition: { ...readyResult.digitalEdition, coverUrl: null },
+    provenance: {
+      ...readyResult.provenance,
+      originalSha256: 'b'.repeat(64),
+      finalSha256: 'c'.repeat(64),
+      transformation: 'generated',
+      generatedAt: '2026-07-10T18:05:00Z',
+      generatorVersion: 'structured-epub/1',
+      transformationSteps: ['normalized authorized HTML', 'packaged deterministic EPUB'],
+    },
+    delivery: { ...readyResult.delivery, sha256: 'c'.repeat(64) },
+  };
+
+  expect(decodeEditionResolutionResult(generated).provenance).toMatchObject({
+    transformation: 'generated',
+    generatorVersion: 'structured-epub/1',
+    generatedAt: '2026-07-10T18:05:00Z',
+    transformationSteps: ['normalized authorized HTML', 'packaged deterministic EPUB'],
+  });
+  expect(() => decodeEditionResolutionResult({
+    ...generated,
+    provenance: { ...generated.provenance, generatedAt: null },
+  })).toThrow(ContractError);
 });
 
 

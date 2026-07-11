@@ -46,7 +46,7 @@ BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backen
 
 Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured; that key also enables the separate, strict Google public-domain EPUB resolver.
 
-Fixture mode is for automation only. Its download is explicitly labeled **Deterministic test fixture** and contains no source-book text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it downloads one of the reviewed Standard Ebooks editions, checks its pinned SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
+Fixture mode is for automation only. Its unchanged-download fixture is explicitly labeled **Deterministic test fixture** and contains no source-book text. The development-only scenario launcher also provides **Generated test EPUB** and **Generated plain-text EPUB**: both run the real deterministic generation, EPUBCheck, delivery-token, and native export path using purpose-built test text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it downloads one of the reviewed Standard Ebooks editions, checks its pinned SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
 
 ### Expo Go on a physical iPhone
 
@@ -82,7 +82,22 @@ The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_AP
 - **Google Books** is considered only when its API response says `US`, `FULL_PUBLIC_DOMAIN`, `publicDomain: true`, `ALL_PAGES`, and supplies a non-ACS EPUB download. Samples, account-bound downloads, partial views, and non-Google download hosts are rejected. Its download may make one explicitly allowlisted Google-host redirect; the resulting file is still inspected and EPUBCheck-validated.
 - **Project Gutenberg** is never scraped from its main website at runtime. Its adapter accepts only a separately configured, reviewed HTTPS mirror/harvest manifest with pinned file hashes, preserving the included Project Gutenberg license. It is intentionally disabled until such a mirror is provisioned.
 
-The resolver automatically selects the highest-priority approved edition. When one approved edition fails before verification, it can try the next distinct reviewed source and records the source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
+The resolver automatically selects the highest-priority approved edition. When an existing EPUB cannot be legally delivered or verified, it can try the next distinct reviewed EPUB and then an eligible reviewed structured source; it records that source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
+
+## Structured-source generation behavior
+
+An existing reviewed EPUB is always preferred. If no existing EPUB can be legally delivered and verified for the confirmed work, the backend can use a separately reviewed structured-source snapshot and generate an EPUB only when all of these hold:
+
+- The source snapshot is explicitly modeled in the structured catalog with its source URL, retrieval timestamp, rights evidence, format, and pinned SHA-256.
+- The rights policy permits a generated EPUB in the U.S. for public domain, CC0, and CC BY with reviewed attribution. CC BY-SA remains fail-closed until the generator can attach and verify an explicit compliant derivative license.
+- The source fits the deliberately small supported subset: strict HTML documents/fragments or plain text with explicit `# ` chapter markers. Scripts, remote/embedded images, active elements, malformed markup, unsupported attributes, and ambiguous chapter structure fail closed.
+- The generated archive passes container safety inspection, a normalized source/output text-integrity comparison, and EPUBCheck before a short-lived delivery token is issued.
+
+Generated files include a navigation document, source and license notice, a typographic cover, language and accessibility metadata, and provenance for the source retrieval time, conversion time, source hash, final EPUB hash, converter version, and transformation steps. The iOS result explicitly says **Generated open edition** and never describes it as an unchanged download. A source that cannot be safely converted shows an honest refusal and has no export action.
+
+This first generator intentionally does **not** normalize XML/XHTML declarations or reuse source images. Those capabilities require separate structural and rights rules, so such input is refused rather than silently simplified.
+
+The production structured catalog intentionally starts empty: no external HTML or text source is enabled until its exact rights evidence and content snapshot have been reviewed. The two development fixture routes exist solely to exercise this end-to-end path without presenting fixture text as a real book source.
 
 ## Verification
 

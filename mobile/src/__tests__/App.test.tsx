@@ -28,7 +28,11 @@ import type {
 } from '../api/metadata';
 import type { EditionClient } from '../api/editions';
 import type { EpubDeliveryClient } from '../api/epubDelivery';
-import { readyEditionScenario } from '../dev/editionScenarios';
+import {
+  generatedEditionScenario,
+  generatedPlainTextEditionScenario,
+  readyEditionScenario,
+} from '../dev/editionScenarios';
 
 const healthyClient = (): BackendClient => ({
   checkHealth: jest.fn().mockResolvedValue({
@@ -238,10 +242,52 @@ describe('<App />', () => {
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Open-license fallback details' }));
 
-    expect(view.getByText('Checked the next approved source after an earlier edition could not be verified.')).toBeTruthy();
+    expect(view.getByText('Checked a later approved path after an earlier option could not be delivered.')).toBeTruthy();
     expect(view.getByText('No reusable source cover')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
     expect(view.getByText('CC BY 4.0')).toBeTruthy();
+  });
+
+  test('routes the generated test EPUB scenario through the normal resolver flow', async () => {
+    const editions: EditionClient = {
+      resolve: jest.fn().mockResolvedValue(generatedEditionScenario),
+    };
+    const view = render(
+      <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Generated test EPUB' }));
+
+    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateId: 'fixture:generated-html',
+        workTitle: 'Structured Open Text',
+      }),
+      expect.anything(),
+    );
+  });
+
+  test('routes the generated plain-text EPUB scenario through the normal resolver flow', async () => {
+    const editions: EditionClient = {
+      resolve: jest.fn().mockResolvedValue(generatedPlainTextEditionScenario),
+    };
+    const view = render(
+      <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'Generated plain-text EPUB' }));
+
+    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateId: 'fixture:generated-plain-text',
+        workTitle: 'Structured Plain Text',
+      }),
+      expect.anything(),
+    );
   });
 
   test('downloads a verified EPUB, opens the native handoff, and cleans the local copy before another scan', async () => {

@@ -50,11 +50,14 @@ export type EditionProvenance = {
   retrievedAt: string;
   originalSha256: string;
   finalSha256: string;
-  transformation: 'unchanged';
+  transformation: 'unchanged' | 'generated';
   epubcheckVersion: string;
   epubcheckStatus: 'valid';
   epubcheckWarnings: string[];
   sourceAttempts: string[];
+  generatedAt: string | null;
+  generatorVersion: string | null;
+  transformationSteps: string[];
 };
 
 export type EpubDeliveryInfo = {
@@ -208,11 +211,47 @@ function decodeRights(value: unknown): EditionRightsInfo {
 function decodeProvenance(value: unknown): EditionProvenance {
   if (!isRecord(value) || typeof value.catalogEntryId !== 'string'
     || typeof value.catalogReviewedAt !== 'string' || typeof value.acquisitionUrl !== 'string'
-    || typeof value.retrievedAt !== 'string' || !isSha(value.originalSha256)
-    || !isSha(value.finalSha256) || value.transformation !== 'unchanged'
+    || !isIsoDate(value.retrievedAt) || !isSha(value.originalSha256)
+    || !isSha(value.finalSha256)
     || typeof value.epubcheckVersion !== 'string' || value.epubcheckStatus !== 'valid'
     || !isStringArray(value.epubcheckWarnings) || !isStringArray(value.sourceAttempts)) throw new ContractError('Edition provenance was invalid');
-  return value as EditionProvenance;
+  const transformation = value.transformation;
+  if (transformation !== 'unchanged' && transformation !== 'generated') {
+    throw new ContractError('Edition provenance transformation was invalid');
+  }
+  const generatorVersion = value.generatorVersion === undefined ? null : value.generatorVersion;
+  const transformationSteps = value.transformationSteps === undefined ? [] : value.transformationSteps;
+  const generatedAt = value.generatedAt;
+  if (!isNullableString(generatorVersion) || !isNullableString(generatedAt)
+    || !isStringArray(transformationSteps)) {
+    throw new ContractError('Edition provenance transformation details were invalid');
+  }
+  if (transformation === 'generated' && (
+    !generatorVersion || transformationSteps.length === 0 || !generatedAt || !isIsoDate(generatedAt)
+  )) {
+    throw new ContractError('Generated edition provenance was incomplete');
+  }
+  if (transformation === 'unchanged' && (
+    generatedAt !== null || generatorVersion !== null || transformationSteps.length > 0
+  )) {
+    throw new ContractError('Unchanged edition provenance contained transformation details');
+  }
+  return {
+    catalogEntryId: value.catalogEntryId,
+    catalogReviewedAt: value.catalogReviewedAt,
+    acquisitionUrl: value.acquisitionUrl,
+    retrievedAt: value.retrievedAt,
+    originalSha256: value.originalSha256,
+    finalSha256: value.finalSha256,
+    transformation,
+    epubcheckVersion: value.epubcheckVersion,
+    epubcheckStatus: value.epubcheckStatus,
+    epubcheckWarnings: value.epubcheckWarnings,
+    sourceAttempts: value.sourceAttempts,
+    generatedAt,
+    generatorVersion,
+    transformationSteps,
+  };
 }
 
 function decodeDelivery(value: unknown): EpubDeliveryInfo {
