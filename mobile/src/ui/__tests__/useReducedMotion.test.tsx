@@ -3,7 +3,7 @@ import { AccessibilityInfo, Text } from 'react-native';
 
 import { useReducedMotion, useReducedMotionStatus } from '../useReducedMotion';
 
-let reduceMotionListener: ((enabled: boolean) => void) | undefined;
+let reduceMotionListeners: Set<(enabled: boolean) => void>;
 let removeListener: jest.Mock;
 let mockIsReduceMotionEnabled: jest.SpyInstance<Promise<boolean>, []>;
 
@@ -20,9 +20,15 @@ function StatusProbe() {
   return <Text>{reducedMotion ? 'ready-reduced' : 'ready-full'}</Text>;
 }
 
+function emitReduceMotion(enabled: boolean) {
+  act(() => {
+    reduceMotionListeners.forEach((listener) => listener(enabled));
+  });
+}
+
 describe('useReducedMotion', () => {
   beforeEach(() => {
-    reduceMotionListener = undefined;
+    reduceMotionListeners = new Set();
     removeListener = jest.fn();
     mockIsReduceMotionEnabled = jest
       .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
@@ -30,7 +36,13 @@ describe('useReducedMotion', () => {
     jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(
       ((eventName: string, listener: (enabled: boolean) => void) => {
         if (eventName === 'reduceMotionChanged') {
-          reduceMotionListener = listener;
+          reduceMotionListeners.add(listener);
+          return {
+            remove: () => {
+              reduceMotionListeners.delete(listener);
+              removeListener();
+            },
+          };
         }
 
         return { remove: removeListener };
@@ -52,9 +64,7 @@ describe('useReducedMotion', () => {
 
     expect(view.getByText('unknown')).toBeTruthy();
 
-    act(() => {
-      reduceMotionListener?.(true);
-    });
+    emitReduceMotion(true);
 
     expect(view.getByText('ready-reduced')).toBeTruthy();
 
@@ -64,66 +74,64 @@ describe('useReducedMotion', () => {
     });
 
     expect(view.getByText('ready-reduced')).toBeTruthy();
-  });
-
-  test('uses the latest preference and listens for later changes', async () => {
-    const view = render(<Probe />);
-
-    expect(view.getByText('reduced')).toBeTruthy();
-    await waitFor(() => expect(view.getByText('full')).toBeTruthy());
-
-    act(() => {
-      reduceMotionListener?.(true);
-    });
-
-    expect(view.getByText('reduced')).toBeTruthy();
-  });
-
-  test('keeps a newer preference event when the initial read resolves later', async () => {
-    let resolveInitialPreference!: (enabled: boolean) => void;
-    const initialPreference = new Promise<boolean>((resolve) => {
-      resolveInitialPreference = resolve;
-    });
-    mockIsReduceMotionEnabled.mockReturnValue(initialPreference);
-    const view = render(<Probe />);
-
-    expect(view.getByText('reduced')).toBeTruthy();
-
-    act(() => {
-      reduceMotionListener?.(false);
-    });
-
-    expect(view.getByText('full')).toBeTruthy();
-
-    await act(async () => {
-      resolveInitialPreference(true);
-      await initialPreference;
-    });
-
-    expect(view.getByText('full')).toBeTruthy();
-  });
-
-  test('removes its preference listener when unmounted', async () => {
-    const view = render(<Probe />);
-
-    await waitFor(() => expect(view.getByText('full')).toBeTruthy());
     view.unmount();
-
-    expect(removeListener).toHaveBeenCalledTimes(1);
   });
 
-  test('starts later consumers with the latest known preference', async () => {
+  test('clears a cached preference after all observers unmount', async () => {
     const first = render(<StatusProbe />);
 
+    emitReduceMotion(false);
     expect(first.getByText('ready-full')).toBeTruthy();
+    first.unmount();
 
-    const later = render(<StatusProbe />);
+    let resolveFreshPreference!: (enabled: boolean) => void;
+    const freshPreference = new Promise<boolean>((resolve) => {
+      resolveFreshPreference = resolve;
+    });
+    mockIsReduceMotionEnabled.mockReturnValue(freshPreference);
+    const fresh = render(<StatusProbe />);
+
+    expect(fresh.getByText('unknown')).toBeTruthy();
 
     await act(async () => {
-      await Promise.resolve();
+      resolveFreshPreference(false);
+      await freshPreference;
     });
 
-    expect(later.getByText('ready-full')).toBeTruthy();
-    expect(mockIsReduceMotionEnabled).toHaveBeenCalled();
+    expect(fresh.getByText('ready-full')).toBeTruthy();
+    fresh.unmount();
+  });
+
+  test('keeps later screen consumers fresh while an observer stays mounted', () => {
+    const observer = render(<StatusProbe />);
+
+    emitReduceMotion(false);
+    expect(observer.getByText('ready-full')).toBeTruthy();
+
+    const firstScreen = render(<StatusProbe />);
+    expect(firstScreen.getByText('ready-full')).toBeTruthy();
+    firstScreen.unmount();
+
+    emitReduceMotion(true);
+    expect(observer.getByText('ready-reduced')).toBeTruthy();
+
+    const laterScreen = render(<StatusProbe />);
+    expect(laterScreen.getByText('ready-reduced')).toBeTruthy();
+
+    laterScreen.unmount();
+    observer.unmount();
+  });
+
+  test('preserves the boolean helper and listener cleanup', () => {
+    const view = render(<Probe />);
+
+    emitReduceMotion(false);
+    expect(view.getByText('full')).toBeTruthy();
+
+    emitReduceMotion(true);
+    expect(view.getByText('reduced')).toBeTruthy();
+
+    view.unmount();
+    expect(removeListener).toHaveBeenCalledTimes(1);
   });
 });

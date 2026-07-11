@@ -1,5 +1,5 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { Keyboard } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, Keyboard, Text } from 'react-native';
 
 jest.mock('expo-camera', () => {
   const React = require('react');
@@ -35,6 +35,14 @@ import {
   pdfConversionRefusalScenario,
   readyEditionScenario,
 } from '../dev/editionScenarios';
+import { useReducedMotionStatus } from '../ui/useReducedMotion';
+
+function MotionStatusProbe() {
+  const { isReady, reducedMotion } = useReducedMotionStatus();
+
+  if (!isReady) return <Text>motion-unknown</Text>;
+  return <Text>{reducedMotion ? 'motion-reduced' : 'motion-full'}</Text>;
+}
 
 const healthyClient = (): BackendClient => ({
   checkHealth: jest.fn().mockResolvedValue({
@@ -76,6 +84,57 @@ const metadataClient = (
 });
 
 describe('<App />', () => {
+  beforeEach(() => {
+    jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
+    jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(
+      (() => ({ remove: jest.fn() })) as never,
+    );
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  test('keeps the root Reduce Motion observer current across navigation', async () => {
+    const listeners = new Set<(enabled: boolean) => void>();
+    const isReduceMotionEnabled = jest.mocked(AccessibilityInfo.isReduceMotionEnabled);
+    const addEventListener = jest.mocked(AccessibilityInfo.addEventListener);
+    addEventListener.mockImplementation(
+      ((eventName: string, listener: (enabled: boolean) => void) => {
+        if (eventName === 'reduceMotionChanged') {
+          listeners.add(listener);
+          return { remove: () => listeners.delete(listener) };
+        }
+
+        return { remove: jest.fn() };
+      }) as never,
+    );
+    const app = render(<App client={healthyClient()} showScenarioLauncher={false} />);
+    let screen: ReturnType<typeof render> | undefined;
+
+    try {
+      await waitFor(() => expect(app.getByText('Backend connected')).toBeTruthy());
+      await act(async () => {
+        await Promise.resolve();
+      });
+      expect(listeners.size).toBeGreaterThan(0);
+
+      fireEvent.press(app.getByRole('button', { name: 'Open scanner' }));
+      expect(app.getByText('Scan a cover or ISBN')).toBeTruthy();
+
+      act(() => {
+        listeners.forEach((listener) => listener(true));
+      });
+      isReduceMotionEnabled.mockResolvedValue(true);
+      screen = render(<MotionStatusProbe />);
+
+      expect(screen.getByText('motion-reduced')).toBeTruthy();
+    } finally {
+      screen?.unmount();
+      app.unmount();
+    }
+  });
+
   test('checks backend connectivity and enters the scanner shell', async () => {
     const view = render(
       <App client={healthyClient()} showScenarioLauncher={false} />,

@@ -45,6 +45,7 @@ import {
   SecondaryButton,
   StatusMessage,
 } from './src/ui/primitives';
+import { useReducedMotionStatus } from './src/ui/useReducedMotion';
 
 export type AppProps = {
   client?: BackendClient;
@@ -105,6 +106,7 @@ export default function App({
   epubDeliveryClient = deferredEpubDeliveryClient,
   showScenarioLauncher = __DEV__,
 }: AppProps) {
+  useReducedMotionStatus();
   const [state, dispatch] = useReducer(appReducer, initialAppState);
   const [searchState, dispatchSearch] = useReducer(searchReducer, initialSearchState);
   const [editionState, dispatchEdition] = useReducer(editionReducer, initialEditionState);

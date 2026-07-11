@@ -12,6 +12,7 @@ const unknownReducedMotionStatus: ReducedMotionStatus = {
 };
 
 let latestPreference: boolean | undefined;
+let observerCount = 0;
 
 function initialReducedMotionStatus(): ReducedMotionStatus {
   if (latestPreference !== undefined) {
@@ -25,6 +26,7 @@ export function useReducedMotionStatus(): ReducedMotionStatus {
   const [status, setStatus] = useState<ReducedMotionStatus>(initialReducedMotionStatus);
 
   useEffect(() => {
+    observerCount += 1;
     let active = true;
     let receivedChange = false;
     const setKnownStatus = (reducedMotion: boolean) => {
@@ -49,6 +51,10 @@ export function useReducedMotionStatus(): ReducedMotionStatus {
     return () => {
       active = false;
       subscription.remove();
+      observerCount -= 1;
+      if (observerCount === 0) {
+        latestPreference = undefined;
+      }
     };
   }, []);
 
