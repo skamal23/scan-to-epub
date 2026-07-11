@@ -1,10 +1,31 @@
 import { fireEvent, render } from '@testing-library/react-native';
-import { AccessibilityInfo } from 'react-native';
+import { AccessibilityInfo, StyleSheet } from 'react-native';
 
 import type { EditionResolutionResult } from '../../api/editions';
 import { metadataScenarios } from '../../dev/metadataScenarios';
 import type { EditionState } from '../../state/editionState';
 import { initialExportState, type ExportState } from '../../state/exportState';
+import { colors, radius } from '../../ui/theme';
+
+type MockEntranceProps = {
+  children: React.ReactNode;
+  testID?: string;
+};
+
+const mockEntrance = jest.fn(({ children }: MockEntranceProps) => children);
+
+jest.mock('../../ui/Entrance', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    Entrance: (props: MockEntranceProps) => React.createElement(
+      View,
+      { testID: props.testID ?? 'entrance' },
+      mockEntrance(props),
+    ),
+  };
+});
+
 import { EditionResolutionFlow } from '../EditionResolutionFlow';
 
 
@@ -53,14 +74,13 @@ const props = {
   onRefreshEdition: jest.fn(),
 };
 
-test('searching state preserves the confirmed physical edition', () => {
+test('searching state keeps the waiting outcome concise', () => {
   const state: EditionState = { status: 'searching', result: null, message: null };
   const view = render(<EditionResolutionFlow {...props} state={state} />);
 
-  expect(view.getByText('Work confirmed')).toBeTruthy();
-  expect(view.getByText('Checking reviewed sources and analyzing a PDF safely where needed…')).toBeTruthy();
-  expect(view.getByText('Your physical edition')).toBeTruthy();
-  expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
+  expect(view.getByText('Finding a reading copy')).toBeTruthy();
+  expect(view.getByText('Looking for a copy you can open…')).toBeTruthy();
+  expect(view.queryByText('Your physical edition')).toBeNull();
 });
 
 
@@ -73,7 +93,7 @@ test('marks changing edition states for assistive technologies', () => {
   );
 
   expect(
-    searching.getByText('Checking reviewed sources and analyzing a PDF safely where needed…')
+    searching.getByText('Looking for a copy you can open…')
       .props.accessibilityLiveRegion,
   ).toBe('polite');
   searching.unmount();
@@ -95,29 +115,60 @@ test('marks changing edition states for assistive technologies', () => {
   const refusal = render(<EditionResolutionFlow {...props} state={unavailable} />);
 
   expect(refusal.getByRole('alert')).toHaveTextContent(
-    'No reviewed open edition is available for this work yet.',
+    'Try another book or come back later.',
   );
 });
 
-test('ready state shows verified digital edition and auditable rights details', () => {
+test('ready state keeps the book, outcome, and export choices ahead of Details', () => {
   const state: EditionState = { status: 'resolved', result: ready, message: null };
   const view = render(<EditionResolutionFlow {...props} state={state} />);
 
-  expect(view.getByText('Verified open edition')).toBeTruthy();
+  expect(view.getByText('Ready to read')).toBeTruthy();
   expect(view.getByText('Pride and Prejudice').props.accessibilityLiveRegion).toBe('polite');
-  expect(view.getByText('Standard Ebooks')).toBeTruthy();
-  expect(view.getByText(/may differ from your physical copy/i)).toBeTruthy();
-  fireEvent.press(view.getByRole('button', { name: 'Open in Books' }));
+  expect(view.queryByText('Verified open edition')).toBeNull();
+  expect(view.queryByText('Standard Ebooks')).toBeNull();
+  expect(view.queryByText('CC0 1.0 Universal')).toBeNull();
+  expect(view.queryByText('Passed through unchanged')).toBeNull();
+  expect(view.queryByText('EPUBCheck 5.3.0 · Valid')).toBeNull();
+  expect(view.queryByText('Penguin Classics, 2003')).toBeNull();
+  expect(view.queryByText(/open digital edition may differ/i)).toBeNull();
+
+  const buttons = view.getAllByRole('button');
+  expect(buttons.map((button) => button.props.accessibilityLabel)).toEqual([
+    'Open in Books',
+    'Save to Files',
+    'Details',
+    'Scan another book',
+  ]);
+
+  const books = view.getByRole('button', { name: 'Open in Books' });
+  const files = view.getByRole('button', { name: 'Save to Files' });
+  fireEvent.press(books);
   expect(props.onExport).toHaveBeenCalledWith('books');
-  fireEvent.press(view.getByRole('button', { name: 'Save to Files' }));
+  fireEvent.press(files);
   expect(props.onExport).toHaveBeenCalledWith('files');
-  fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
+
+  const details = view.getByRole('button', { name: 'Details' });
+  expect(details).toBeTruthy();
+  expect(view.getByTestId('ready-edition-card').findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
+  fireEvent.press(details);
+
+  expect(view.getByRole('button', { name: 'Hide details' })).toBeTruthy();
   expect(view.getByText('CC0 1.0 Universal')).toBeTruthy();
   expect(view.getByText('United States')).toBeTruthy();
   expect(view.getByText('EPUBCheck 5.3.0 · Valid')).toBeTruthy();
   expect(view.getByText('2026-07-10T18:00:00Z')).toBeTruthy();
   expect(view.getByText(`SHA-256 ${'a'.repeat(12)}…`)).toBeTruthy();
   expect(view.getByText('Jane Austen, public domain.')).toBeTruthy();
+  expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
+  expect(view.getByText(/open digital edition may differ/i)).toBeTruthy();
+
+  expect(StyleSheet.flatten(view.getByTestId('edition-details').props.style)).toMatchObject({
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.card,
+    borderWidth: 1,
+  });
 });
 
 
@@ -134,7 +185,7 @@ test('announces the actual ready edition title', () => {
     />,
   );
 
-  expect(announce).toHaveBeenCalledWith('Pride and Prejudice is ready.');
+  expect(announce).toHaveBeenCalledWith('Pride and Prejudice is ready to read.');
   announce.mockRestore();
 });
 
@@ -151,11 +202,11 @@ test('uses an explicit placeholder when the source does not authorize a reusable
     />,
   );
 
-  expect(view.getByText('No reusable source cover')).toBeTruthy();
+  expect(view.getByText('No cover available')).toBeTruthy();
 });
 
 
-test('labels a generated source-to-EPUB result without implying it was downloaded unchanged', () => {
+test('keeps generated-source evidence inside Details without changing the ready path', () => {
   const generated: EditionResolutionResult = {
     ...ready,
     digitalEdition: { ...ready.digitalEdition!, title: 'Structured Open Text', coverUrl: null },
@@ -181,10 +232,12 @@ test('labels a generated source-to-EPUB result without implying it was downloade
     />,
   );
 
-  expect(view.getByText('Generated open edition')).toBeTruthy();
-  expect(view.getByText(/converted into this EPUB without AI-generated text/i)).toBeTruthy();
-  expect(view.getByText('No reusable source cover')).toBeTruthy();
-  fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
+  expect(view.getByText('Ready to read')).toBeTruthy();
+  expect(view.queryByText('Generated open edition')).toBeNull();
+  expect(view.queryByText(/converted into this EPUB without AI-generated text/i)).toBeNull();
+  expect(view.queryByText('Reviewed structured source')).toBeNull();
+  expect(view.getByText('No cover available')).toBeTruthy();
+  fireEvent.press(view.getByRole('button', { name: 'Details' }));
   expect(view.getByText('Generated from authorized source')).toBeTruthy();
   expect(view.getByText('structured-epub/1')).toBeTruthy();
   expect(view.getByText('2026-07-10T18:05:00Z')).toBeTruthy();
@@ -194,7 +247,7 @@ test('labels a generated source-to-EPUB result without implying it was downloade
 });
 
 
-test('explains a verified fallback without presenting a catalog chooser', () => {
+test('keeps fallback provenance in Details without presenting a catalog chooser', () => {
   const fallback: EditionResolutionResult = {
     ...ready,
     provenance: { ...ready.provenance!, sourceAttempts: ['Standard Ebooks', 'OAPEN'] },
@@ -206,8 +259,9 @@ test('explains a verified fallback without presenting a catalog chooser', () => 
     />,
   );
 
+  expect(view.queryByText('Checked a later approved path after an earlier option could not be delivered.')).toBeNull();
+  fireEvent.press(view.getByRole('button', { name: 'Details' }));
   expect(view.getByText('Checked a later approved path after an earlier option could not be delivered.')).toBeTruthy();
-  fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
   expect(view.getByText('Standard Ebooks → OAPEN')).toBeTruthy();
 });
 
@@ -218,12 +272,23 @@ test('shows download progress and lets the user cancel without leaving the confi
   };
   const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
 
-  expect(view.getByText('Downloading verified EPUB')).toBeTruthy();
-  expect(view.getByText('Downloading verified EPUB').props.accessibilityLiveRegion).toBe('polite');
+  expect(view.getByText('Getting your book ready')).toBeTruthy();
+  expect(view.getByText('Getting your book ready').props.accessibilityLiveRegion).toBe('polite');
   expect(view.getByText('50%').props.accessibilityLiveRegion).toBeUndefined();
   expect(view.getByText('50%')).toBeTruthy();
   fireEvent.press(view.getByRole('button', { name: 'Cancel download' }));
   expect(props.onCancelExport).toHaveBeenCalled();
+});
+
+test('keeps the share-sheet guidance short and static', () => {
+  const exportState: ExportState = {
+    status: 'sharing', intent: 'books', file: null,
+    progress: null, message: null, code: null,
+  };
+  const view = render(<EditionResolutionFlow {...props} state={{ status: 'resolved', result: ready, message: null }} exportState={exportState} />);
+
+  expect(view.getByText('Choose Books in the share sheet.')).toBeTruthy();
+  expect(view.queryByText('Share sheet open')).toBeNull();
 });
 
 test('announces that an EPUB is ready again after the share sheet closes', () => {
@@ -266,22 +331,26 @@ test('treats an expired delivery as a recheck of the same confirmed edition', ()
   expect(props.onRefreshEdition).toHaveBeenCalled();
 });
 
-test('unavailable and error states stay honest and recoverable', () => {
+test('unavailable and error states stay concise, alerting, and recoverable', () => {
   const unavailable: EditionState = {
     status: 'resolved', message: null,
     result: { status: 'unavailable', reason: 'No reviewed open edition is available for this work yet.', physicalEdition: null, digitalEdition: null, source: null, rights: null, provenance: null, delivery: null },
   };
   const first = render(<EditionResolutionFlow {...props} state={unavailable} />);
-  expect(first.getByText('Book identified, open edition unavailable')).toBeTruthy();
-  expect(first.queryByText(/shadow|search the web/i)).toBeNull();
+  expect(first.getByText('No open edition available')).toBeTruthy();
+  expect(first.getByRole('alert')).toHaveTextContent('Try another book or come back later.');
+  expect(first.queryByText('No reviewed open edition is available for this work yet.')).toBeNull();
+  expect(first.getByTestId('recovery-content').findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
   fireEvent.press(first.getByRole('button', { name: 'Scan another book' }));
   expect(props.onScanAnother).toHaveBeenCalled();
   first.unmount();
 
   const error: EditionState = { status: 'error', result: null, message: 'Source unavailable' };
   const second = render(<EditionResolutionFlow {...props} state={error} />);
-  expect(second.getByText('Open-edition check unavailable')).toBeTruthy();
-  fireEvent.press(second.getByRole('button', { name: 'Try source check again' }));
+  expect(second.getByText("Couldn't check this book")).toBeTruthy();
+  expect(second.getByRole('alert')).toHaveTextContent('Try again in a moment.');
+  expect(second.queryByText('Source unavailable')).toBeNull();
+  fireEvent.press(second.getByRole('button', { name: 'Try again' }));
   expect(props.onRetry).toHaveBeenCalled();
 });
 
@@ -302,7 +371,9 @@ test('explains a safe structured-source conversion refusal without offering an e
   };
   const view = render(<EditionResolutionFlow {...props} state={refusal} />);
 
-  expect(view.getByText('We found an authorized structured source, but could not safely convert it into an EPUB.')).toBeTruthy();
+  expect(view.getByText('No open edition available')).toBeTruthy();
+  expect(view.getByText('Try another book or come back later.')).toBeTruthy();
+  expect(view.queryByText('We found an authorized structured source, but could not safely convert it into an EPUB.')).toBeNull();
   expect(view.queryByRole('button', { name: 'Open in Books' })).toBeNull();
   expect(view.queryByRole('button', { name: 'Save to Files' })).toBeNull();
 });

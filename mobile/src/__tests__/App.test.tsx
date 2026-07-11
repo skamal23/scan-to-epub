@@ -396,11 +396,10 @@ describe('<App />', () => {
       expect.anything(),
     );
     fireEvent.press(view.getByRole('button', { name: 'Choose Pride and Prejudice by Jane Austen' }));
-    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
-    expect(view.getByText('Work confirmed')).toBeTruthy();
-    expect(view.getByText('Your physical edition')).toBeTruthy();
-    expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
-    expect(view.getByText(/open digital edition may differ/i)).toBeTruthy();
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
+    expect(view.getByText('Pride and Prejudice')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Open in Books' })).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Details' })).toBeTruthy();
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         workTitle: 'Pride and Prejudice',
@@ -418,7 +417,7 @@ describe('<App />', () => {
     await settleLaunch();
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Verified open edition' }));
-    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({ workTitle: 'Pride and Prejudice' }),
       expect.anything(),
@@ -427,7 +426,7 @@ describe('<App />', () => {
     fireEvent.press(view.getByRole('button', { name: 'Back' }));
     fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
     fireEvent.press(view.getByRole('button', { name: 'Open edition unavailable' }));
-    expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy();
+    expect(view.getByText('No open edition available')).toBeTruthy();
   });
 
   test('opens a deterministic open-license fallback-details scenario', async () => {
@@ -436,9 +435,10 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Open-license fallback details' }));
 
+    expect(view.getByText('No cover available')).toBeTruthy();
+    expect(view.queryByText('Checked a later approved path after an earlier option could not be delivered.')).toBeNull();
+    fireEvent.press(view.getByRole('button', { name: 'Details' }));
     expect(view.getByText('Checked a later approved path after an earlier option could not be delivered.')).toBeTruthy();
-    expect(view.getByText('No reusable source cover')).toBeTruthy();
-    fireEvent.press(view.getByRole('button', { name: 'Why this edition is available' }));
     expect(view.getByText('CC BY 4.0')).toBeTruthy();
   });
 
@@ -453,7 +453,8 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Generated test EPUB' }));
 
-    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
+    expect(view.getByText('Structured Open Text (test export)')).toBeTruthy();
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         candidateId: 'fixture:generated-html',
@@ -474,7 +475,8 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Generated plain-text EPUB' }));
 
-    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
+    expect(view.getByText('Structured Plain Text (test export)')).toBeTruthy();
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         candidateId: 'fixture:generated-plain-text',
@@ -495,7 +497,8 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'PDF test EPUB' }));
 
-    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
+    expect(view.getByText('Authorized PDF Source (test export)')).toBeTruthy();
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         candidateId: 'fixture:generated-pdf',
@@ -516,7 +519,7 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'PDF conversion refused' }));
 
-    await waitFor(() => expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('No open edition available')).toBeTruthy());
     expect(editions.resolve).toHaveBeenCalledWith(
       expect.objectContaining({
         candidateId: 'fixture:pdf-refused',
@@ -524,9 +527,10 @@ describe('<App />', () => {
       }),
       expect.anything(),
     );
-    expect(view.getByText(
+    expect(view.getByText('Try another book or come back later.')).toBeTruthy();
+    expect(view.queryByText(
       'We found an authorized PDF, but could not safely convert its layout into an EPUB.',
-    )).toBeTruthy();
+    )).toBeNull();
     expect(view.queryByRole('button', { name: 'Open in Books' })).toBeNull();
     expect(view.queryByRole('button', { name: 'Save to Files' })).toBeNull();
   });
@@ -571,10 +575,10 @@ describe('<App />', () => {
     await settleLaunch();
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Edition source offline' }));
-    expect(view.getByText('Open-edition check unavailable')).toBeTruthy();
+    expect(view.getByText("Couldn't check this book")).toBeTruthy();
 
-    fireEvent.press(view.getByRole('button', { name: 'Try source check again' }));
-    await waitFor(() => expect(view.getByText('Verified open edition')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Try again' }));
+    await waitFor(() => expect(view.getByText('Ready to read')).toBeTruthy());
     expect(editions.resolve).toHaveBeenCalledTimes(1);
   });
 

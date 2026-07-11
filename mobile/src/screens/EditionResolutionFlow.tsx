@@ -6,11 +6,11 @@ import { useAccessibilityAnnouncement } from '../accessibility/useAccessibilityA
 import type { MetadataCandidate } from '../api/metadata';
 import type { EditionState } from '../state/editionState';
 import type { ExportIntent, ExportState } from '../state/exportState';
+import { Entrance } from '../ui/Entrance';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
-
+import { colors, motion, radius, spacing, type } from '../ui/theme';
 
 export function EditionResolutionFlow({
-  candidate,
   state,
   onBack,
   onRetry,
@@ -35,35 +35,35 @@ export function EditionResolutionFlow({
   useAccessibilityAnnouncement(editionAnnouncement(state, exportState));
 
   if (state.status === 'searching' || state.status === 'idle') {
-    return <Searching candidate={candidate} onBack={onBack} />;
+    return <Searching onBack={onBack} />;
   }
   if (state.status === 'error') {
     return (
       <MessageScreen
-        title="Open-edition check unavailable"
-        body={state.message ?? 'Please try the approved source again.'}
-        primary={{ label: 'Try source check again', onPress: onRetry }}
-        secondary={{ label: 'Back to book', onPress: onBack }}
+        title="Couldn't check this book"
+        body="Try again in a moment."
+        primary={{ label: 'Try again', onPress: onRetry }}
+        secondary={{ label: 'Back', onPress: onBack }}
       />
     );
   }
   if (!state.result || state.result.status === 'unavailable') {
     return (
       <MessageScreen
-        title="Book identified, open edition unavailable"
-        body={state.result?.reason ?? 'No reviewed open edition is available for this work yet.'}
+        title="No open edition available"
+        body="Try another book or come back later."
         primary={{ label: 'Scan another book', onPress: onScanAnother }}
-        secondary={{ label: 'Back to book', onPress: onBack }}
+        secondary={{ label: 'Back', onPress: onBack }}
       />
     );
   }
   if (!state.result.digitalEdition || !state.result.source || !state.result.rights || !state.result.provenance || !state.result.delivery) {
     return (
       <MessageScreen
-        title="Open-edition check unavailable"
-        body="The result was incomplete. Please try again."
-        primary={{ label: 'Try source check again', onPress: onRetry }}
-        secondary={{ label: 'Back to book', onPress: onBack }}
+        title="Couldn't check this book"
+        body="Try again in a moment."
+        primary={{ label: 'Try again', onPress: onRetry }}
+        secondary={{ label: 'Back', onPress: onBack }}
       />
     );
   }
@@ -82,46 +82,44 @@ export function EditionResolutionFlow({
 
 function editionAnnouncement(state: EditionState, exportState: ExportState): string | null {
   if (state.status === 'searching' || state.status === 'idle') {
-    return 'Checking reviewed sources and validating the open edition.';
+    return 'Looking for a copy you can open.';
   }
   if (state.status === 'error') {
-    return `Open-edition check unavailable. ${state.message ?? 'Please try the approved source again.'}`;
+    return "Couldn't check this book. Try again in a moment.";
   }
   if (!state.result || state.result.status === 'unavailable') {
-    return `Book identified, open edition unavailable. ${state.result?.reason ?? 'No reviewed open edition is available for this work yet.'}`;
+    return 'No open edition available. Try another book or come back later.';
   }
   if (exportState.status === 'downloading') {
-    return 'Downloading verified EPUB.';
+    return 'Getting your book ready.';
   }
   if (exportState.status === 'sharing') {
-    return 'The iOS share sheet is open.';
+    return exportState.intent === 'files'
+      ? 'Choose Files in the share sheet.'
+      : 'Choose Books in the share sheet.';
   }
   if (exportState.status === 'error') {
-    return exportState.message ?? 'The EPUB could not be prepared.';
+    return exportState.message ?? 'The book could not be prepared.';
   }
   if (exportState.status === 'ready' && exportState.message) {
     return exportState.message;
   }
-  return `${state.result.digitalEdition?.title ?? 'Open edition'} is ready.`;
+  return `${state.result.digitalEdition?.title ?? 'Your book'} is ready to read.`;
 }
 
-function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack(): void }) {
-  const physical = [candidate.edition.publisher, candidate.edition.publishedDate].filter(Boolean).join(', ');
+function Searching({ onBack }: { onBack(): void }) {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={[styles.content, styles.centered]}>
-        <Text style={styles.eyebrow}>WORK CONFIRMED</Text>
-        <Text style={styles.title}>Work confirmed</Text>
-        <Text accessibilityLiveRegion="polite" style={styles.subtitle}>
-          Checking reviewed sources and analyzing a PDF safely where needed…
-        </Text>
-        <Text style={styles.body}>Validating rights, source integrity, PDF layout when applicable, and EPUB conformance.</Text>
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Your physical edition</Text>
-          <Text style={styles.infoBody}>{physical || 'Edition details unavailable'}</Text>
-          <Text style={styles.infoBody}>The open digital edition may differ from your physical edition.</Text>
-        </View>
-        <SecondaryButton label="Cancel source check" onPress={onBack} />
+        <Entrance testID="searching-content">
+          <View style={styles.messageCopy}>
+            <Text style={styles.title}>Finding a reading copy</Text>
+            <Text accessibilityLiveRegion="polite" style={styles.body}>
+              Looking for a copy you can open…
+            </Text>
+          </View>
+        </Entrance>
+        <SecondaryButton label="Cancel" onPress={onBack} />
       </View>
     </SafeAreaView>
   );
@@ -152,43 +150,26 @@ function Ready({
   const physical = result.physicalEdition;
   const physicalPublication = [physical?.publisher, physical?.publishedDate].filter(Boolean).join(', ');
   const isGenerated = provenance.transformation === 'generated';
+
   return (
     <SafeAreaView style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
-        <Text style={styles.eyebrow}>{isGenerated ? 'GENERATED OPEN EDITION' : 'VERIFIED OPEN EDITION'}</Text>
-        <Text style={styles.title}>
-          {isGenerated ? 'Generated open edition' : 'Verified open edition'}
-        </Text>
-        <View style={styles.editionCard}>
-          {digital.coverUrl ? (
-            <Image source={{ uri: digital.coverUrl }} style={styles.cover} />
-          ) : (
-            <View style={[styles.cover, styles.coverPlaceholder]}>
-              <Text style={styles.coverPlaceholderText}>No reusable source cover</Text>
+        <Text style={styles.title}>Ready to read</Text>
+        <Entrance distance={motion.cardDistance} testID="ready-edition-card">
+          <View style={styles.editionCard}>
+            {digital.coverUrl ? (
+              <Image accessible={false} source={{ uri: digital.coverUrl }} style={styles.cover} />
+            ) : (
+              <View style={[styles.cover, styles.coverPlaceholder]}>
+                <Text style={styles.coverPlaceholderText}>No cover available</Text>
+              </View>
+            )}
+            <View style={styles.editionCopy}>
+              <Text accessibilityLiveRegion="polite" style={styles.editionTitle}>{digital.title}</Text>
+              <Text style={styles.editionAuthor}>{digital.authors.join(', ')}</Text>
             </View>
-          )}
-          <View style={styles.editionCopy}>
-            <Text accessibilityLiveRegion="polite" style={styles.editionTitle}>{digital.title}</Text>
-            <Text style={styles.editionAuthor}>{digital.authors.join(', ')}</Text>
-            <Text style={styles.source}>{source.organization}</Text>
           </View>
-        </View>
-        <Text style={styles.body}>
-          {isGenerated
-            ? 'A reviewed, rights-cleared source was converted into this EPUB without AI-generated text. Its formatting may differ from your physical copy.'
-            : 'A legal open edition of this work is available. Its cover, introduction, notes, formatting, or pagination may differ from your physical copy.'}
-        </Text>
-        {provenance.sourceAttempts.length > 1 ? (
-          <Text style={styles.sourceFallback}>
-            Checked a later approved path after an earlier option could not be delivered.
-          </Text>
-        ) : null}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoTitle}>Work confirmed</Text>
-          <Text style={styles.infoTitle}>Your physical edition</Text>
-          <Text style={styles.infoBody}>{physicalPublication || 'Edition details unavailable'}</Text>
-          <Text style={styles.infoBody}>The open digital edition may differ from your physical edition.</Text>
-        </View>
+        </Entrance>
         <ExportActions
           state={exportState}
           onExport={onExport}
@@ -197,11 +178,13 @@ function Ready({
           onRefreshEdition={onRefreshEdition}
         />
         <SecondaryButton
-          label={detailsOpen ? 'Hide edition details' : 'Why this edition is available'}
+          compact
+          label={detailsOpen ? 'Hide details' : 'Details'}
           onPress={() => setDetailsOpen((open) => !open)}
         />
         {detailsOpen ? (
-          <View style={styles.detailsCard}>
+          <View style={styles.detailsCard} testID="edition-details">
+            <Text style={styles.detailsTitle}>Details</Text>
             <Detail label="Source" value={source.organization} />
             <Detail label="License" value={rights.licenseName} />
             {rights.attribution ? <Detail label="Attribution" value={rights.attribution} /> : null}
@@ -226,10 +209,24 @@ function Ready({
             ) : (
               <Text style={styles.hash}>SHA-256 {provenance.finalSha256.slice(0, 12)}…</Text>
             )}
+            <Detail label="Your physical edition" value={physicalPublication || 'Edition details unavailable'} />
+            <Text style={styles.detailsBody}>
+              The open digital edition may differ from your physical copy in cover, introduction, notes, formatting, or pagination.
+            </Text>
+            {isGenerated ? (
+              <Text style={styles.detailsBody}>
+                A reviewed, rights-cleared source was converted into this EPUB without AI-generated text.
+              </Text>
+            ) : null}
+            {provenance.sourceAttempts.length > 1 ? (
+              <Text style={styles.detailsBody}>
+                Checked a later approved path after an earlier option could not be delivered.
+              </Text>
+            ) : null}
             <Text style={styles.detailsBody}>{rights.rightsStatement}</Text>
           </View>
         ) : null}
-        <SecondaryButton label="Scan another book" onPress={onScanAnother} />
+        <SecondaryButton compact label="Scan another book" onPress={onScanAnother} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -254,7 +251,7 @@ function ExportActions({
       : `${Math.round(state.progress.fraction * 100)}%`;
     return (
       <View style={styles.exportPanel}>
-        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>Downloading verified EPUB</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>Getting your book ready</Text>
         <Text style={styles.exportBody}>{percentage}</Text>
         <SecondaryButton label="Cancel download" onPress={onCancel} />
       </View>
@@ -262,12 +259,11 @@ function ExportActions({
   }
   if (state.status === 'sharing') {
     const instruction = state.intent === 'files'
-      ? 'Choose Save to Files in the iOS share sheet.'
-      : 'Choose Books in the iOS share sheet.';
+      ? 'Choose Files in the share sheet.'
+      : 'Choose Books in the share sheet.';
     return (
       <View style={styles.exportPanel}>
-        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>Share sheet open</Text>
-        <Text style={styles.exportBody}>{instruction}</Text>
+        <Text accessibilityLiveRegion="polite" style={styles.exportTitle}>{instruction}</Text>
       </View>
     );
   }
@@ -281,7 +277,7 @@ function ExportActions({
       {state.status === 'error' ? (
         <View style={styles.exportPanel}>
           <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.exportBody}>
-            {state.message ?? 'The EPUB could not be prepared.'}
+            {state.message ?? 'The book could not be prepared.'}
           </Text>
           {state.code === 'expired' ? (
             <PrimaryButton label="Check edition again" onPress={onRefreshEdition} />
@@ -290,7 +286,6 @@ function ExportActions({
           )}
         </View>
       ) : null}
-      <Text style={styles.exportHint}>One final tap in the iOS share sheet chooses Books or Save to Files.</Text>
       <PrimaryButton label="Open in Books" onPress={() => onExport('books')} />
       <SecondaryButton label="Save to Files" onPress={() => onExport('files')} />
     </View>
@@ -315,10 +310,14 @@ function MessageScreen({ title, body, primary, secondary }: {
   return (
     <SafeAreaView style={styles.screen}>
       <View style={[styles.content, styles.centered]}>
-        <Text style={styles.title}>{title}</Text>
-        <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.body}>
-          {body}
-        </Text>
+        <Entrance testID="recovery-content">
+          <View style={styles.messageCopy}>
+            <Text style={styles.title}>{title}</Text>
+            <Text accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.body}>
+              {body}
+            </Text>
+          </View>
+        </Entrance>
         <PrimaryButton label={primary.label} onPress={primary.onPress} />
         <SecondaryButton label={secondary.label} onPress={secondary.onPress} />
       </View>
@@ -327,34 +326,61 @@ function MessageScreen({ title, body, primary, secondary }: {
 }
 
 const styles = StyleSheet.create({
-  screen: { backgroundColor: '#F4F1EA', flex: 1 },
-  content: { gap: 18, padding: 28, paddingBottom: 48 },
+  screen: { backgroundColor: colors.canvas, flex: 1 },
+  content: { gap: spacing.xl, padding: spacing.xl, paddingBottom: 48 },
   centered: { flex: 1, justifyContent: 'center' },
-  eyebrow: { color: '#52705F', fontSize: 12, fontWeight: '700', letterSpacing: 1.3 },
-  title: { color: '#1D241F', fontSize: 34, fontWeight: '700', letterSpacing: -0.8 },
-  subtitle: { color: '#1D241F', fontSize: 22, fontWeight: '600' },
-  body: { color: '#60605A', fontSize: 17, lineHeight: 25 },
-  infoBox: { backgroundColor: '#E8E5DC', borderRadius: 16, gap: 7, padding: 18 },
-  infoTitle: { color: '#1D241F', fontSize: 15, fontWeight: '700' },
-  infoBody: { color: '#575750', fontSize: 15, lineHeight: 21 },
-  editionCard: { backgroundColor: '#FFFFFF', borderRadius: 18, flexDirection: 'row', gap: 18, padding: 16 },
-  cover: { backgroundColor: '#DEDCD5', borderRadius: 9, height: 168, width: 112 },
-  coverPlaceholder: { alignItems: 'center', justifyContent: 'center', padding: 12 },
-  coverPlaceholderText: { color: '#60605A', fontSize: 13, fontWeight: '600', lineHeight: 18, textAlign: 'center' },
-  editionCopy: { flex: 1, gap: 8, justifyContent: 'center' },
-  editionTitle: { color: '#1D241F', fontSize: 22, fontWeight: '700' },
-  editionAuthor: { color: '#555A56', fontSize: 17 },
-  source: { color: '#52705F', fontSize: 14, fontWeight: '700' },
-  sourceFallback: { color: '#52705F', fontSize: 14, fontWeight: '600', lineHeight: 20 },
-  exportStack: { gap: 12 },
-  exportPanel: { backgroundColor: '#E8E5DC', borderRadius: 16, gap: 9, padding: 18 },
-  exportTitle: { color: '#1D241F', fontSize: 17, fontWeight: '700' },
-  exportBody: { color: '#60605A', fontSize: 15, lineHeight: 21 },
-  exportHint: { color: '#60605A', fontSize: 14, lineHeight: 20 },
-  detailsCard: { backgroundColor: '#FFFFFF', borderRadius: 16, gap: 12, padding: 18 },
-  detailRow: { flexDirection: 'row', gap: 16, justifyContent: 'space-between' },
-  detailLabel: { color: '#777871', fontSize: 14 },
-  detailValue: { color: '#1D241F', flex: 1, fontSize: 14, fontWeight: '600', textAlign: 'right' },
-  hash: { color: '#6B6C66', fontFamily: 'Courier', fontSize: 12 },
-  detailsBody: { color: '#60605A', fontSize: 14, lineHeight: 20 },
+  messageCopy: { gap: spacing.md },
+  title: { color: colors.ink, fontSize: type.title, fontWeight: '700', letterSpacing: -0.8 },
+  body: { color: colors.mutedInk, fontSize: type.body, lineHeight: 25 },
+  editionCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    flexDirection: 'row',
+    gap: spacing.lg,
+    padding: spacing.lg,
+  },
+  cover: {
+    backgroundColor: colors.evergreenSoft,
+    borderRadius: radius.control,
+    height: 192,
+    width: 128,
+  },
+  coverPlaceholder: { alignItems: 'center', justifyContent: 'center', padding: spacing.md },
+  coverPlaceholderText: {
+    color: colors.mutedInk,
+    fontSize: type.metadata,
+    fontWeight: '600',
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  editionCopy: { flex: 1, gap: spacing.sm, justifyContent: 'center' },
+  editionTitle: { color: colors.ink, fontSize: 26, fontWeight: '700', lineHeight: 31 },
+  editionAuthor: { color: colors.mutedInk, fontSize: type.body, lineHeight: 23 },
+  exportStack: { gap: spacing.md },
+  exportPanel: {
+    backgroundColor: colors.evergreenSoft,
+    borderColor: colors.line,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  exportTitle: { color: colors.ink, fontSize: type.body, fontWeight: '700', lineHeight: 24 },
+  exportBody: { color: colors.mutedInk, fontSize: 15, lineHeight: 21 },
+  detailsCard: {
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    gap: spacing.md,
+    padding: spacing.lg,
+  },
+  detailsTitle: { color: colors.ink, fontSize: type.body, fontWeight: '700' },
+  detailRow: { flexDirection: 'row', gap: spacing.lg, justifyContent: 'space-between' },
+  detailLabel: { color: colors.mutedInk, flexShrink: 0, fontSize: type.metadata },
+  detailValue: { color: colors.ink, flex: 1, fontSize: type.metadata, fontWeight: '600', textAlign: 'right' },
+  hash: { color: colors.mutedInk, fontFamily: 'Courier', fontSize: 12 },
+  detailsBody: { color: colors.mutedInk, fontSize: type.metadata, lineHeight: 20 },
 });

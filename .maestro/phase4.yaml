@@ -12,16 +12,14 @@ name: Phase 4 rights-aware edition resolution
       text: Verified open edition
     direction: DOWN
 - tapOn: Verified open edition
-- assertVisible: Verified open edition
-- assertVisible: Deterministic test fixture
-- assertVisible: The open digital edition may differ.*
+- assertVisible: Ready to read
 - assertVisible: Open in Books
 - assertVisible: Save to Files
 - scrollUntilVisible:
     element:
-      text: Why this edition is available
+      text: Details
     direction: DOWN
-- tapOn: Why this edition is available
+- tapOn: Details
 - scrollUntilVisible:
     element:
       text: Test-only artifact
@@ -34,6 +32,10 @@ name: Phase 4 rights-aware edition resolution
     direction: DOWN
 - assertVisible: Passed through unchanged
 - takeScreenshot: .maestro/artifacts/phase4-verified
+- scrollUntilVisible:
+    element:
+      text: Scan another book
+    direction: DOWN
 - tapOn: Scan another book
 - tapOn: Back
 - tapOn: Test scenarios
@@ -42,8 +44,8 @@ name: Phase 4 rights-aware edition resolution
       text: Open edition unavailable
     direction: DOWN
 - tapOn: Open edition unavailable
-- assertVisible: Book identified, open edition unavailable
-- assertVisible: No reviewed open edition is available.*
+- assertVisible: No open edition available
+- assertVisible: Try another book or come back later.
 - takeScreenshot: .maestro/artifacts/phase4-unavailable
 - tapOn: Scan another book
 - tapOn: Back
@@ -53,8 +55,8 @@ name: Phase 4 rights-aware edition resolution
       text: Edition source offline
     direction: DOWN
 - tapOn: Edition source offline
-- assertVisible: Open-edition check unavailable
-- assertVisible: Open-edition source is temporarily unavailable
-- tapOn: Try source check again
-- assertVisible: Verified open edition
+- assertVisible: Couldn't check this book
+- assertVisible: Try again in a moment.
+- tapOn: Try again
+- assertVisible: Ready to read
 - takeScreenshot: .maestro/artifacts/phase4-retry

@@ -12,14 +12,18 @@ name: Phase 6 approved-source fallback details
       text: Open-license fallback details
     direction: DOWN
 - tapOn: Open-license fallback details
-- assertVisible: Verified open edition
-- assertVisible: No reusable source cover
-- assertVisible: Checked a later approved path after an earlier option could not be delivered.
+- assertVisible: Ready to read
+- assertVisible: No cover available
 - scrollUntilVisible:
     element:
-      text: Why this edition is available
+      text: Details
     direction: DOWN
-- tapOn: Why this edition is available
+- tapOn: Details
+- scrollUntilVisible:
+    element:
+      text: Checked a later approved path after an earlier option could not be delivered.
+    direction: DOWN
+- assertVisible: Checked a later approved path after an earlier option could not be delivered.
 - scrollUntilVisible:
     element:
       text: CC BY 4.0
