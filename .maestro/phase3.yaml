@@ -14,8 +14,8 @@ name: Phase 3 cover recognition states
 - tapOn: "Cover: strong match"
 - assertVisible: Scan a cover or ISBN
 - tapOn: Capture cover or detected ISBN
-- assertVisible: Is this the right book?
-- assertVisible: Strong cover match—please confirm the work.
+- assertVisible: Is this your book?
+- assertVisible: Choose Pride and Prejudice by Jane Austen
 - assertVisible: Scan again
 - takeScreenshot: .maestro/artifacts/phase3-strong
 - tapOn: Scan again
@@ -27,7 +27,7 @@ name: Phase 3 cover recognition states
     direction: DOWN
 - tapOn: "Cover: ambiguous"
 - tapOn: Capture cover or detected ISBN
-- assertVisible: A few cover matches are possible.*
+- assertVisible: Is this your book?
 - assertVisible: Choose Invisible Man by Ralph Ellison
 - assertVisible: Choose The Invisible Man by H. G. Wells
 - tapOn: None—scan again

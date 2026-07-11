@@ -15,7 +15,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import type { MetadataCandidate, MetadataQuery } from '../api/metadata';
 import type { SearchState } from '../state/searchState';
+import { Entrance } from '../ui/Entrance';
 import { PrimaryButton, SecondaryButton } from '../ui/primitives';
+import { colors, radius, spacing, type } from '../ui/theme';
 
 export function ManualSearchFlow({
   state,
@@ -26,7 +28,6 @@ export function ManualSearchFlow({
   onRetry,
   onSearch,
   origin = 'manual',
-  recognitionConfidence,
 }: {
   state: SearchState;
   onBack(): void;
@@ -76,7 +77,6 @@ export function ManualSearchFlow({
         onBack={onEdit}
         onConfirm={onConfirm}
         origin={origin}
-        recognitionConfidence={recognitionConfidence}
       />
     );
   }
@@ -140,10 +140,12 @@ function SearchForm({
           keyboardShouldPersistTaps="handled"
         >
           <SecondaryButton compact label="Back" onPress={onBack} />
-          <View style={styles.headingGroup}>
-            <Text style={styles.title}>Find your book</Text>
-            <Text style={styles.body}>ISBN is most exact. Title and author work when the barcode is unavailable.</Text>
-          </View>
+          <Entrance>
+            <View style={styles.headingGroup}>
+              <Text style={styles.title}>Find your book</Text>
+              <Text style={styles.body}>Search by ISBN or title.</Text>
+            </View>
+          </Entrance>
           <Field
             accessibilityLabel="ISBN"
             label="ISBN"
@@ -194,7 +196,7 @@ function Field(props: {
         autoCorrect={false}
         onChangeText={props.onChangeText}
         placeholder={props.placeholder}
-        placeholderTextColor="#8A8A84"
+        placeholderTextColor={colors.mutedInk}
         style={styles.input}
         testID={props.testID}
         value={props.value}
@@ -209,14 +211,12 @@ function CandidateScreen({
   onBack,
   onConfirm,
   origin,
-  recognitionConfidence,
 }: {
   candidates: MetadataCandidate[];
   providerFailures: string[];
   onBack(): void;
   onConfirm(candidate: MetadataCandidate): void;
   origin: 'manual' | 'isbn' | 'cover';
-  recognitionConfidence?: 'high' | 'medium' | 'low';
 }) {
   const scrollView = useRef<ScrollView>(null);
 
@@ -237,25 +237,17 @@ function CandidateScreen({
       >
         <SecondaryButton compact label={origin === 'cover' ? 'Scan again' : 'Edit search'} onPress={onBack} />
         <View style={styles.headingGroup}>
-          <Text style={styles.title}>Is this the right book?</Text>
-          <Text style={styles.body}>{origin === 'cover'
-            ? recognitionConfidence === 'high'
-              ? 'Strong cover match—please confirm the work.'
-              : recognitionConfidence === 'medium'
-                ? 'A few cover matches are possible. Choose the right work.'
-                : 'The cover evidence is limited. Please check these possibilities.'
-            : candidates.length === 1
-              ? '1 possible match'
-              : `${candidates.length} possible matches`}</Text>
+          <Text style={styles.title}>Is this your book?</Text>
           {providerFailures.length > 0 ? (
-            <Text style={styles.warning}>Some catalogs were unavailable. Results may be limited.</Text>
+            <Entrance>
+              <Text style={styles.warning}>Some catalogs were unavailable. Results may be limited.</Text>
+            </Entrance>
           ) : null}
         </View>
         {candidates.map((candidate) => (
           <CandidateCard key={candidate.candidateId} candidate={candidate} onPress={() => onConfirm(candidate)} />
         ))}
         <SecondaryButton label={origin === 'cover' ? 'None—scan again' : 'None of these'} onPress={onBack} />
-        <Text style={styles.note}>Choose the underlying work. A legal digital edition may be a different publication.</Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -290,7 +282,6 @@ function CandidateCard({ candidate, onPress }: { candidate: MetadataCandidate; o
         <Text style={styles.cardTitle}>{candidate.work.title}</Text>
         <Text style={styles.cardAuthor}>{candidate.work.authors.join(', ') || 'Unknown author'}</Text>
         {publication ? <Text style={styles.cardMetadata}>{publication}</Text> : null}
-        <Text style={styles.matchReason}>{candidate.matchReasons.join(' · ')}</Text>
       </View>
     </Pressable>
   );
@@ -343,49 +334,57 @@ function MessageScreen({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  screen: { backgroundColor: '#F4F1EA', flex: 1 },
-  content: { gap: 18, padding: 24, paddingBottom: 44 },
+  screen: { backgroundColor: colors.canvas, flex: 1 },
+  content: { gap: spacing.lg, padding: spacing.xl, paddingBottom: 44 },
   centered: { flex: 1, justifyContent: 'center' },
-  headingGroup: { gap: 8, marginVertical: 8 },
-  eyebrow: { color: '#68756D', fontSize: 12, fontWeight: '700', letterSpacing: 1.4 },
-  title: { color: '#1D241F', fontSize: 32, fontWeight: '700', letterSpacing: -0.7 },
-  body: { color: '#575750', fontSize: 17, lineHeight: 24 },
-  fieldGroup: { gap: 8 },
-  label: { color: '#343A36', fontSize: 15, fontWeight: '600' },
+  headingGroup: { gap: spacing.sm, marginVertical: spacing.xs },
+  eyebrow: { color: colors.evergreen, fontSize: type.eyebrow, fontWeight: '700', letterSpacing: 1.4 },
+  title: { color: colors.ink, fontSize: type.title, fontWeight: '700', letterSpacing: -0.7 },
+  body: { color: colors.mutedInk, fontSize: type.body, lineHeight: 24 },
+  fieldGroup: { gap: spacing.sm },
+  label: { color: colors.ink, fontSize: 15, fontWeight: '600' },
   input: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#C8C5BD',
-    borderRadius: 12,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.control,
     borderWidth: 1,
-    color: '#1D241F',
-    fontSize: 17,
-    minHeight: 50,
+    color: colors.ink,
+    fontSize: type.body,
+    minHeight: 52,
     paddingHorizontal: 14,
   },
-  or: { color: '#777871', fontSize: 12, fontWeight: '700', textAlign: 'center' },
-  error: { color: '#9B4A46', fontSize: 14 },
-  warning: { color: '#765B2A', fontSize: 14, lineHeight: 20 },
-  note: { color: '#686861', fontSize: 13, lineHeight: 19, textAlign: 'center' },
+  or: { color: colors.mutedInk, fontSize: type.eyebrow, fontWeight: '700', textAlign: 'center' },
+  error: { color: colors.danger, fontSize: type.metadata },
+  warning: { color: colors.warning, fontSize: type.metadata, lineHeight: 20 },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#DEDAD1',
-    borderRadius: 16,
+    backgroundColor: colors.surface,
+    borderColor: colors.line,
+    borderRadius: radius.card,
     borderWidth: 1,
     flexDirection: 'row',
-    gap: 14,
-    padding: 14,
+    gap: spacing.lg,
+    padding: spacing.lg,
   },
   pressed: { opacity: 0.72 },
-  cover: { backgroundColor: '#E3DFD5', borderRadius: 7, height: 112, width: 74 },
+  cover: {
+    backgroundColor: colors.evergreenSoft,
+    borderRadius: radius.control,
+    height: 132,
+    width: 88,
+  },
   coverFallback: { alignItems: 'center', justifyContent: 'center' },
-  coverFallbackText: { color: '#777871', fontSize: 11 },
-  cardCopy: { flex: 1, gap: 5, justifyContent: 'center' },
-  cardTitle: { color: '#1D241F', fontSize: 18, fontWeight: '700' },
-  cardAuthor: { color: '#4B514D', fontSize: 15 },
-  cardMetadata: { color: '#686861', fontSize: 13 },
-  matchReason: { color: '#4F6D5B', fontSize: 12, fontWeight: '600', marginTop: 4 },
-  confirmedTitle: { color: '#1D241F', fontSize: 22, fontWeight: '600' },
-  infoBox: { backgroundColor: '#E9E6DE', borderRadius: 14, gap: 8, padding: 16 },
-  infoTitle: { color: '#343A36', fontSize: 14, fontWeight: '700' },
-  infoBody: { color: '#575750', fontSize: 14, lineHeight: 20 },
+  coverFallbackText: { color: colors.mutedInk, fontSize: type.eyebrow },
+  cardCopy: { flex: 1, gap: spacing.xs, justifyContent: 'center' },
+  cardTitle: { color: colors.ink, fontSize: 22, fontWeight: '700', lineHeight: 27 },
+  cardAuthor: { color: colors.mutedInk, fontSize: 15 },
+  cardMetadata: { color: colors.mutedInk, fontSize: type.metadata },
+  confirmedTitle: { color: colors.ink, fontSize: 22, fontWeight: '600' },
+  infoBox: {
+    backgroundColor: colors.evergreenSoft,
+    borderRadius: radius.control,
+    gap: spacing.sm,
+    padding: spacing.lg,
+  },
+  infoTitle: { color: colors.ink, fontSize: type.metadata, fontWeight: '700' },
+  infoBody: { color: colors.mutedInk, fontSize: type.metadata, lineHeight: 20 },
 });

@@ -52,7 +52,7 @@ name: Phase 2 ISBN scanner states
 - tapOn: Single ISBN
 - assertVisible: ISBN found. Hold steady…
 - tapOn: Capture cover or detected ISBN
-- assertVisible: Is this the right book?
+- assertVisible: Is this your book?
 - tapOn: Edit search
 - tapOn: Back
 - tapOn: Back
@@ -62,6 +62,6 @@ name: Phase 2 ISBN scanner states
       text: Repeated ISBN
     direction: DOWN
 - tapOn: Repeated ISBN
-- assertVisible: Is this the right book?
+- assertVisible: Is this your book?
 - assertVisible: Choose Pride and Prejudice by Jane Austen
 - takeScreenshot: .maestro/artifacts/phase2-result

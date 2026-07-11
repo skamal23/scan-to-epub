@@ -331,12 +331,12 @@ describe('<App />', () => {
     openScenariosFromScanner(view);
     fireEvent.press(view.getByRole('button', { name: 'Ambiguous books' }));
 
-    expect(view.getByText('Is this the right book?')).toBeTruthy();
-    expect(view.getByText('2 possible matches')).toBeTruthy();
+    expect(view.getByText('Is this your book?')).toBeTruthy();
+    expect(view.getByRole('button', { name: 'Choose Invisible Man by Ralph Ellison' })).toBeTruthy();
     expect(metadata.search).not.toHaveBeenCalled();
   });
 
-  test('recognizes a deterministic cover and explains its confidence before confirmation', async () => {
+  test('keeps rescan available at the concise deterministic cover confirmation', async () => {
     const view = render(
       <App client={healthyClient()} showScenarioLauncher />,
     );
@@ -345,8 +345,8 @@ describe('<App />', () => {
     fireEvent.press(view.getByRole('button', { name: 'Cover: strong match' }));
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
 
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
-    expect(view.getByText('Strong cover match—please confirm the work.')).toBeTruthy();
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
+    expect(view.queryByText('Strong cover match—please confirm the work.')).toBeNull();
     expect(view.getByRole('button', { name: 'Scan again' })).toBeTruthy();
   });
 
@@ -361,7 +361,7 @@ describe('<App />', () => {
     expect(view.getByText('Search unavailable')).toBeTruthy();
 
     fireEvent.press(view.getByRole('button', { name: 'Try again' }));
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
     expect(metadata.search).toHaveBeenCalledWith(
       {
         title: 'Pride and Prejudice',
@@ -389,7 +389,7 @@ describe('<App />', () => {
     fireEvent.changeText(view.getByLabelText('ISBN'), '9780141439518');
     fireEvent.press(view.getByRole('button', { name: 'Find book' }));
 
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
     expect(dismissKeyboard).toHaveBeenCalled();
     expect(metadata.search).toHaveBeenCalledWith(
       { isbn: '9780141439518' },
@@ -616,7 +616,7 @@ describe('<App />', () => {
     fireEvent.changeText(view.getByLabelText('Book title'), 'Pride and Prejudice');
     fireEvent.press(view.getByRole('button', { name: 'Find book' }));
 
-    await waitFor(() => expect(view.getByText('2 possible matches')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
     fireEvent.press(view.getByRole('button', { name: 'None of these' }));
     expect(view.getByLabelText('Book title')).toHaveProp('value', 'Pride and Prejudice');
   });
@@ -638,7 +638,7 @@ describe('<App />', () => {
 
     await waitFor(() => expect(view.getByText('Search unavailable')).toBeTruthy());
     fireEvent.press(view.getByRole('button', { name: 'Try again' }));
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
     expect(metadata.search).toHaveBeenCalledTimes(2);
   });
 
@@ -668,7 +668,7 @@ describe('<App />', () => {
 
     resolveSearch({ observedIsbn: null, candidates: [prideCandidate], providerFailures: [] });
     await Promise.resolve();
-    expect(view.queryByText('Is this the right book?')).toBeNull();
+    expect(view.queryByText('Is this your book?')).toBeNull();
     expect(view.getByLabelText('Book title')).toBeTruthy();
   });
 
@@ -684,7 +684,7 @@ describe('<App />', () => {
     fireEvent.press(view.getByRole('button', { name: 'Search manually' }));
     fireEvent.changeText(view.getByLabelText('ISBN'), '9780141439518');
     fireEvent.press(view.getByRole('button', { name: 'Find book' }));
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
 
     fireEvent(view.getByTestId('cover-pride'), 'error');
     expect(view.getByText('No cover')).toBeTruthy();
@@ -704,7 +704,7 @@ describe('<App />', () => {
     fireEvent.press(view.getByRole('button', { name: 'Repeated ISBN' }));
 
     expect(view.getByText('ISBN captured.')).toBeTruthy();
-    await waitFor(() => expect(view.getByText('Is this the right book?')).toBeTruthy());
+    await waitFor(() => expect(view.getByText('Is this your book?')).toBeTruthy());
     expect(metadata.search).toHaveBeenCalledWith(
       { isbn: '9780141439518' },
       expect.anything(),

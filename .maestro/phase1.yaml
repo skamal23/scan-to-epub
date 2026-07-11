@@ -11,8 +11,8 @@ name: Phase 1 manual identification flow
 - inputText: 9780141439518
 - tapOn: Find your book
 - tapOn: Find book
-- assertVisible: Is this the right book?
-- assertVisible: 1 possible match
+- assertVisible: Is this your book?
+- assertVisible: Choose Pride and Prejudice by Jane Austen
 - tapOn: Choose Pride and Prejudice by Jane Austen
 - assertVisible: Work confirmed
 - assertVisible: Your physical edition
@@ -31,7 +31,7 @@ name: Phase 1 manual identification flow
       text: Ambiguous books
     direction: DOWN
 - tapOn: Ambiguous books
-- assertVisible: 2 possible matches
+- assertVisible: Is this your book?
 - assertVisible: Choose Invisible Man by Ralph Ellison
 - assertVisible: Choose The Invisible Man by H. G. Wells
 - tapOn: None of these
@@ -44,6 +44,7 @@ name: Phase 1 manual identification flow
       text: Catalog warning
     direction: DOWN
 - tapOn: Catalog warning
+- assertVisible: Is this your book?
 - assertVisible: Some catalogs were unavailable.*
 - tapOn: Edit search
 - tapOn: Back
@@ -56,7 +57,7 @@ name: Phase 1 manual identification flow
 - tapOn: Search error
 - assertVisible: Search unavailable
 - tapOn: Try again
-- assertVisible: Is this the right book?
+- assertVisible: Is this your book?
 - tapOn: Edit search
 - tapOn: Back
 - tapOn: Back
@@ -66,5 +67,6 @@ name: Phase 1 manual identification flow
       text: Long title and no cover
     direction: DOWN
 - tapOn: Long title and no cover
+- assertVisible: Is this your book?
 - assertVisible: Choose The Extremely Long and Unexpectedly Detailed Book Title That Must Still Fit on a Small Screen by Alexandra Example-With-A-Very-Long-Name
 - takeScreenshot: .maestro/artifacts/phase1-long-title
