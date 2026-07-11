@@ -173,45 +173,51 @@ git commit -m "feat: polish launch and scanner experience"
 - Modify: `.maestro/phase2.yaml`
 - Modify: `.maestro/phase3.yaml`
 - Modify: `.maestro/phase4.yaml`
+- Modify: `.maestro/phase5.yaml`
 - Modify: `.maestro/phase6.yaml`
+- Modify: `.maestro/phase7.yaml`
 - Modify: `.maestro/phase8.yaml`
 - Modify: `.maestro/phase8-refusal.yaml`
 - Modify: `.maestro/phase9-golden.yaml`
+- Modify: `.maestro/phase10-launch-scanner.yaml`
 
 **Interfaces:**
 
 - Consumes: the existing `AppState` reducer, camera permission/scanner screen, health client, and development-only scenario launcher.
 - Produces: a scanner-or-permission screen as the default app entry, a fallback home reached only through Back/recovery, and health state that never navigates a user away from their current scanner/search/edition screen.
 
-- [ ] **Step 1: Write the direct-entry failures first**
+- [x] **Step 1: Write the direct-entry failures first**
 
 Add reducer tests proving the initial state is `screen: 'scanner'`, and that `healthSucceeded`/`healthFailed` update connectivity without replacing the active screen. Add App tests proving the default render reaches the scanner shell, Back reaches the minimal fallback home, and a health success resolving after scanner entry does not eject the user from scanning.
 
-- [ ] **Step 2: Run the focused state/App tests to verify the old launch-first behavior fails**
+- [x] **Step 2: Run the focused state/App tests to verify the old launch-first behavior fails**
 
 Run: `cd mobile && pnpm test -- appState.test.ts App.test.tsx`
 
 Expected: failures because the reducer starts at `launch` and health actions force `launch`.
 
-- [ ] **Step 3: Implement a camera-first, recovery-safe entry flow**
+- [x] **Step 3: Implement a camera-first, recovery-safe entry flow**
 
 Set `initialAppState.screen` to `scanner`. Make health actions preserve `state.screen` while updating connectivity/message. Keep the fallback home accessible from scanner Back; it uses only the app name, a short scan prompt, and the open-camera action. Do not show normal online status; show an actionable offline/retry state only. Keep the development-only scenario launcher reachable from that fallback home so deterministic tests retain their entry point.
 
-Update every listed Maestro flow so it launches Expo Go, opens the project, reaches the scanner/permission shell, taps Back to the fallback home only when it needs the development-only scenario launcher, and no longer asserts the user-visible `Backend connected` label. Do not add waits that depend on the physical camera.
+Update every listed Maestro flow so it launches Expo Go, opens the project, reaches the scanner/permission shell, taps Back to the fallback home only when it needs the development-only scenario launcher, and no longer asserts the user-visible `Backend connected` label. This includes the standalone Phase 5/7 share-flow manifests and Phase 10 visual manifest even though Phase 5/7 stay out of the serial golden target because they enter the system-owned share sheet. Do not add waits that depend on the physical camera.
 
-- [ ] **Step 4: Verify entry, recovery, and all deterministic flows**
+- [x] **Step 4: Verify entry, recovery, and all deterministic flows**
 
 Run: `cd mobile && pnpm test -- appState.test.ts App.test.tsx ScannerScreen.test.tsx && pnpm typecheck`, then `make maestro-golden`.
 
 Expected: the app starts at Scan a cover or ISBN (or its permission state), health completion leaves it there, fallback-home retry still works offline, and every fixture flow reaches its scenario without native camera dependence.
 
-- [ ] **Step 5: Commit the camera-first entry slice**
+> **Verification note (2026-07-11):** `make maestro-golden` was attempted after a clean reboot but the local XCTest driver disconnected mid-run after Phase 2/3, without an app assertion failure. After a second clean reboot, every exact constituent flow (Phase 0–10, including the standalone Phase 5/7 share-return flows) passed independently. The aggregate target is repeated again in Task 6's final acceptance suite.
+
+- [x] **Step 5: Commit the camera-first entry slice**
 
 ```bash
 git add mobile/src/state/appState.ts mobile/src/state/__tests__/appState.test.ts mobile/App.tsx \
   mobile/src/__tests__/App.test.tsx .maestro/phase0.yaml .maestro/phase1.yaml \
-  .maestro/phase2.yaml .maestro/phase3.yaml .maestro/phase4.yaml .maestro/phase6.yaml \
-  .maestro/phase8.yaml .maestro/phase8-refusal.yaml .maestro/phase9-golden.yaml
+  .maestro/phase2.yaml .maestro/phase3.yaml .maestro/phase4.yaml .maestro/phase5.yaml \
+  .maestro/phase6.yaml .maestro/phase7.yaml .maestro/phase8.yaml .maestro/phase8-refusal.yaml \
+  .maestro/phase9-golden.yaml .maestro/phase10-launch-scanner.yaml
 git commit -m "feat: open directly to book scanning"
 ```
 
