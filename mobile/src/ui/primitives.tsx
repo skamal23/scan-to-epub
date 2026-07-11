@@ -4,6 +4,7 @@ import {
   Pressable,
   StyleSheet,
   Text,
+  type AccessibilityState,
   View,
 } from 'react-native';
 
@@ -32,11 +33,13 @@ export function PrimaryButton({ label, onPress }: ButtonProps) {
 }
 
 type SecondaryButtonProps = ButtonProps & {
+  accessibilityState?: AccessibilityState;
   appearance?: 'default' | 'onDark';
   compact?: boolean;
 };
 
 export function SecondaryButton({
+  accessibilityState,
   appearance = 'default',
   compact = false,
   label,
@@ -46,6 +49,7 @@ export function SecondaryButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={label}
+      accessibilityState={accessibilityState}
       onPress={onPress}
       style={({ pressed }) => [
         styles.secondaryButton,

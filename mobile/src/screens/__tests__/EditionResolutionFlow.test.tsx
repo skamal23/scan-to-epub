@@ -150,10 +150,13 @@ test('ready state keeps the book, outcome, and export choices ahead of Details',
 
   const details = view.getByRole('button', { name: 'Details' });
   expect(details).toBeTruthy();
+  expect(details.props.accessibilityState).toMatchObject({ expanded: false });
   expect(view.getByTestId('ready-edition-card').findAllByProps({ accessibilityRole: 'button' })).toHaveLength(0);
   fireEvent.press(details);
 
-  expect(view.getByRole('button', { name: 'Hide details' })).toBeTruthy();
+  const hideDetails = view.getByRole('button', { name: 'Hide details' });
+  expect(hideDetails).toBeTruthy();
+  expect(hideDetails.props.accessibilityState).toMatchObject({ expanded: true });
   expect(view.getByText('CC0 1.0 Universal')).toBeTruthy();
   expect(view.getByText('United States')).toBeTruthy();
   expect(view.getByText('EPUBCheck 5.3.0 · Valid')).toBeTruthy();

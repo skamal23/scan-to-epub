@@ -178,6 +178,7 @@ function Ready({
           onRefreshEdition={onRefreshEdition}
         />
         <SecondaryButton
+          accessibilityState={{ expanded: detailsOpen }}
           compact
           label={detailsOpen ? 'Hide details' : 'Details'}
           onPress={() => setDetailsOpen((open) => !open)}
