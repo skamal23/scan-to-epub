@@ -6,7 +6,11 @@ from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Request, Response
 
 from .config import Settings
-from .content_sources.catalog import APPROVED_EPUB_CATALOG, APPROVED_STRUCTURED_CATALOG
+from .content_sources.catalog import (
+    APPROVED_EPUB_CATALOG,
+    APPROVED_PDF_CATALOG,
+    APPROVED_STRUCTURED_CATALOG,
+)
 from .content_sources.google_books import (
     GoogleBooksOpenEditionSource,
     HttpGoogleBooksVolumeClient,
@@ -98,6 +102,7 @@ def create_app(
                 artifact_store=epub_store,
                 dynamic_sources=dynamic_sources,
                 structured_catalog=APPROVED_STRUCTURED_CATALOG,
+                pdf_catalog=APPROVED_PDF_CATALOG,
             )
 
     @app.middleware("http")

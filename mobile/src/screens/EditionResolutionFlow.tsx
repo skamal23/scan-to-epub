@@ -84,8 +84,8 @@ function Searching({ candidate, onBack }: { candidate: MetadataCandidate; onBack
       <View style={[styles.content, styles.centered]}>
         <Text style={styles.eyebrow}>WORK CONFIRMED</Text>
         <Text style={styles.title}>Work confirmed</Text>
-        <Text style={styles.subtitle}>Checking reviewed sources and preparing an EPUB where needed…</Text>
-        <Text style={styles.body}>Validating rights, source integrity, and EPUB conformance.</Text>
+        <Text style={styles.subtitle}>Checking reviewed sources and analyzing a PDF safely where needed…</Text>
+        <Text style={styles.body}>Validating rights, source integrity, PDF layout when applicable, and EPUB conformance.</Text>
         <View style={styles.infoBox}>
           <Text style={styles.infoTitle}>Your physical edition</Text>
           <Text style={styles.infoBody}>{physical || 'Edition details unavailable'}</Text>

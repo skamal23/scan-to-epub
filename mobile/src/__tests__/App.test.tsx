@@ -30,7 +30,9 @@ import type { EditionClient } from '../api/editions';
 import type { EpubDeliveryClient } from '../api/epubDelivery';
 import {
   generatedEditionScenario,
+  generatedPdfEditionScenario,
   generatedPlainTextEditionScenario,
+  pdfConversionRefusalScenario,
   readyEditionScenario,
 } from '../dev/editionScenarios';
 
@@ -288,6 +290,53 @@ describe('<App />', () => {
       }),
       expect.anything(),
     );
+  });
+
+  test('routes the guarded PDF scenario through the normal resolver flow', async () => {
+    const editions: EditionClient = {
+      resolve: jest.fn().mockResolvedValue(generatedPdfEditionScenario),
+    };
+    const view = render(
+      <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'PDF test EPUB' }));
+
+    await waitFor(() => expect(view.getByText('Generated open edition')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateId: 'fixture:generated-pdf',
+        workTitle: 'Authorized PDF Source',
+      }),
+      expect.anything(),
+    );
+  });
+
+  test('shows a guarded PDF refusal without offering an EPUB export', async () => {
+    const editions: EditionClient = {
+      resolve: jest.fn().mockResolvedValue(pdfConversionRefusalScenario),
+    };
+    const view = render(
+      <App client={healthyClient()} editionClient={editions} showScenarioLauncher />,
+    );
+    await waitFor(() => expect(view.getByText('Backend connected')).toBeTruthy());
+    fireEvent.press(view.getByRole('button', { name: 'Test scenarios' }));
+    fireEvent.press(view.getByRole('button', { name: 'PDF conversion refused' }));
+
+    await waitFor(() => expect(view.getByText('Book identified, open edition unavailable')).toBeTruthy());
+    expect(editions.resolve).toHaveBeenCalledWith(
+      expect.objectContaining({
+        candidateId: 'fixture:pdf-refused',
+        workTitle: 'PDF Conversion Refusal',
+      }),
+      expect.anything(),
+    );
+    expect(view.getByText(
+      'We found an authorized PDF, but could not safely convert its layout into an EPUB.',
+    )).toBeTruthy();
+    expect(view.queryByRole('button', { name: 'Open in Books' })).toBeNull();
+    expect(view.queryByRole('button', { name: 'Save to Files' })).toBeNull();
   });
 
   test('downloads a verified EPUB, opens the native handoff, and cleans the local copy before another scan', async () => {

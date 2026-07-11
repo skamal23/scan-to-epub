@@ -79,6 +79,35 @@ class ApprovedStructuredEntry:
 
 
 @dataclass(frozen=True, slots=True)
+class ApprovedPdfEntry:
+    """One reviewed text-based PDF snapshot eligible for guarded conversion."""
+
+    entry_id: str
+    source_key: str
+    priority: int
+    work_title: str
+    aliases: tuple[str, ...]
+    authors: tuple[str, ...]
+    digital_title: str
+    language: str
+    digital_identifier: str
+    publisher: str
+    source_organization: str
+    canonical_url: str
+    pdf_url: str
+    cover_url: str | None
+    content: bytes
+    expected_pdf_sha256: str
+    snapshot_retrieved_at: datetime
+    rights_evidence: RightsEvidence
+    license_name: str
+    license_url: str
+    rights_statement: str
+    attribution: str | None
+    reviewed_at: str
+
+
+@dataclass(frozen=True, slots=True)
 class ApprovedEpubCatalog:
     entries: tuple[ApprovedEpubEntry, ...]
 
@@ -130,6 +159,40 @@ class ApprovedStructuredCatalog:
 
         seen_identifiers: set[str] = set()
         matches: list[ApprovedStructuredEntry] = []
+        for entry in sorted(self.entries, key=lambda item: (item.priority, item.entry_id)):
+            entry_titles = {
+                _normalized(entry.work_title),
+                *(_normalized(alias) for alias in entry.aliases),
+            }
+            entry_authors = {_normalized(author) for author in entry.authors}
+            if normalized_title not in entry_titles or not (normalized_authors & entry_authors):
+                continue
+            identifier = _canonical_identifier(entry.digital_identifier)
+            if identifier in seen_identifiers:
+                continue
+            seen_identifiers.add(identifier)
+            matches.append(entry)
+        return tuple(matches)
+
+
+@dataclass(frozen=True, slots=True)
+class ApprovedPdfCatalog:
+    entries: tuple[ApprovedPdfEntry, ...]
+
+    def find_all(
+        self,
+        title: str,
+        authors: list[str],
+        physical_isbn13: str | None,
+    ) -> tuple[ApprovedPdfEntry, ...]:
+        del physical_isbn13
+        normalized_title = _normalized(title)
+        normalized_authors = {_normalized(author) for author in authors}
+        if not normalized_title or not normalized_authors:
+            return ()
+
+        seen_identifiers: set[str] = set()
+        matches: list[ApprovedPdfEntry] = []
         for entry in sorted(self.entries, key=lambda item: (item.priority, item.entry_id)):
             entry_titles = {
                 _normalized(entry.work_title),

@@ -577,6 +577,7 @@ A simple legal PDF can become a clean EPUB through the same scan flow. Complex o
 - Every complex/image-only fixture fails closed.
 - PDF-derived EPUBs pass EPUBCheck, deterministic content/render checks, and the Simulator share flow; physical Apple Books reading remains pending until Phase 11.
 - The UI never implies that every PDF can be converted.
+- The initial PDF gate is deliberately narrower than the long-term plan: it accepts reviewed, unencrypted, consistently sized single-column text PDFs only; images, forms, tables, mathematical notation, and ambiguous footnotes/marginalia reject safely.
 
 ### User involvement
 

@@ -82,7 +82,7 @@ The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_AP
 - **Google Books** is considered only when its API response says `US`, `FULL_PUBLIC_DOMAIN`, `publicDomain: true`, `ALL_PAGES`, and supplies a non-ACS EPUB download. Samples, account-bound downloads, partial views, and non-Google download hosts are rejected. Its download may make one explicitly allowlisted Google-host redirect; the resulting file is still inspected and EPUBCheck-validated.
 - **Project Gutenberg** is never scraped from its main website at runtime. Its adapter accepts only a separately configured, reviewed HTTPS mirror/harvest manifest with pinned file hashes, preserving the included Project Gutenberg license. It is intentionally disabled until such a mirror is provisioned.
 
-The resolver automatically selects the highest-priority approved edition. When an existing EPUB cannot be legally delivered or verified, it can try the next distinct reviewed EPUB and then an eligible reviewed structured source; it records that source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
+The resolver automatically selects the highest-priority approved edition. When an existing EPUB cannot be legally delivered or verified, it can try the next distinct reviewed EPUB, an eligible reviewed structured source, and then a guarded reviewed PDF snapshot; it records that source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
 
 ## Structured-source generation behavior
 
@@ -98,6 +98,17 @@ Generated files include a navigation document, source and license notice, a typo
 This first generator intentionally does **not** normalize XML/XHTML declarations or reuse source images. Those capabilities require separate structural and rights rules, so such input is refused rather than silently simplified.
 
 The production structured catalog intentionally starts empty: no external HTML or text source is enabled until its exact rights evidence and content snapshot have been reviewed. The two development fixture routes exist solely to exercise this end-to-end path without presenting fixture text as a real book source.
+
+## Guarded PDF conversion behavior
+
+PDF conversion is a separate, stricter fallback. An existing reviewed EPUB and a reviewed structured source are still preferred. A PDF may proceed only from a reviewed, hash-pinned snapshot after the U.S. rights decision has authorized transformation.
+
+- The current gate accepts only unencrypted, consistently sized, text-based, single-column PDFs with no images, forms, tables, mathematical notation, or unclassified footer/marginalia.
+- It removes only repeated top-of-page running headers and numeric page footers, records every removal, and requires every remaining source line to be accounted for exactly once and in reading order.
+- It joins a line-end hyphen only when the following line begins with a lowercase continuation. Other visible hyphens remain unchanged.
+- Its deterministic HTML output enters the same EPUB safety, text-integrity, EPUBCheck, delivery-token, Books, and Files path as other generated editions.
+
+Complex layouts and scans fail closed with “We found an authorized PDF, but could not safely convert its layout into an EPUB.” They never get a download action. The production PDF catalog also starts empty until each exact PDF snapshot, source URL, hash, license, and retrieval timestamp has been reviewed. The development-only PDF scenario uses a purpose-built fixture and is not a source for a real book.
 
 ## Verification
 

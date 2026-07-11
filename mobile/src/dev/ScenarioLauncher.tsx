@@ -10,8 +10,10 @@ import { metadataScenarios } from './metadataScenarios';
 import {
   editionScenarioCandidate,
   generatedEditionScenarioCandidate,
+  generatedPdfEditionScenarioCandidate,
   generatedPlainTextEditionScenarioCandidate,
   openLicenseFallbackScenario,
+  pdfConversionRefusalScenarioCandidate,
   unavailableEditionScenario,
 } from './editionScenarios';
 import { scannerFixtures } from './scannerFixtures';
@@ -150,6 +152,14 @@ export function ScenarioLauncher({
           <SecondaryButton
             label="Generated plain-text EPUB"
             onPress={() => onResolveEdition(generatedPlainTextEditionScenarioCandidate)}
+          />
+          <SecondaryButton
+            label="PDF test EPUB"
+            onPress={() => onResolveEdition(generatedPdfEditionScenarioCandidate)}
+          />
+          <SecondaryButton
+            label="PDF conversion refused"
+            onPress={() => onResolveEdition(pdfConversionRefusalScenarioCandidate)}
           />
           <SecondaryButton
             label="Open edition unavailable"

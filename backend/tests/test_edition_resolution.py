@@ -6,9 +6,12 @@ from datetime import UTC, datetime
 
 import pytest
 from test_epub_safety import epub_bytes
+from test_pdf_analysis import _single_column_pdf, _two_column_pdf
 
 from book_backend.content_sources.approved_catalog import (
     ApprovedEpubCatalog,
+    ApprovedPdfCatalog,
+    ApprovedPdfEntry,
     ApprovedStructuredCatalog,
     ApprovedStructuredEntry,
 )
@@ -154,6 +157,34 @@ def structured_entry(content: bytes) -> ApprovedStructuredEntry:
     )
 
 
+def pdf_entry(content: bytes) -> ApprovedPdfEntry:
+    return ApprovedPdfEntry(
+        entry_id="pdf:authorized-source",
+        source_key="reviewed_pdf_source",
+        priority=30,
+        work_title="Authorized PDF Source",
+        aliases=(),
+        authors=("Example Author",),
+        digital_title="Authorized PDF Source",
+        language="en",
+        digital_identifier="https://example.invalid/authorized-pdf-source",
+        publisher="Example Publisher",
+        source_organization="Reviewed PDF source",
+        canonical_url="https://example.invalid/authorized-pdf-source",
+        pdf_url="https://example.invalid/authorized-pdf-source/source.pdf",
+        cover_url=None,
+        content=content,
+        expected_pdf_sha256=hashlib.sha256(content).hexdigest(),
+        snapshot_retrieved_at=datetime(2026, 7, 10, 16, 0, tzinfo=UTC),
+        rights_evidence="cc_by",
+        license_name="CC BY 4.0",
+        license_url="https://creativecommons.org/licenses/by/4.0/",
+        rights_statement="The reviewed PDF source is explicitly licensed CC BY.",
+        attribution="Example Author, Authorized PDF Source, CC BY 4.0.",
+        reviewed_at="2026-07-10",
+    )
+
+
 def matching_existing_entry(*, rights_evidence="cc0"):
     entry = STANDARD_EBOOKS_CATALOG.entries[0]
     return replace(
@@ -244,6 +275,131 @@ async def test_reviewed_structured_source_generates_a_verified_delivery_when_no_
     assert artifact is not None
     with zipfile.ZipFile(io.BytesIO(bytes(artifact.content))) as archive:
         assert "First preserved paragraph." in archive.read("EPUB/chapter-001.xhtml").decode()
+
+
+@pytest.mark.anyio
+async def test_reviewed_single_column_pdf_generates_a_verified_epub_when_no_other_source_exists():
+    source_content = _single_column_pdf()
+    store = EphemeralEpubStore()
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        pdf_catalog=ApprovedPdfCatalog(entries=(pdf_entry(source_content),)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=store,
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "ready"
+    assert result.provenance.transformation == "generated"
+    assert result.provenance.original_sha256 == hashlib.sha256(source_content).hexdigest()
+    assert result.provenance.retrieved_at == datetime(2026, 7, 10, 16, 0, tzinfo=UTC)
+    assert result.provenance.generator_version == "guarded-pdf/1 + structured-epub/1"
+    assert "accounted for 3 PDF body blocks" in result.provenance.transformation_steps
+    artifact = await store.get(result.delivery.download_token)
+    assert artifact is not None
+    with zipfile.ZipFile(io.BytesIO(bytes(artifact.content))) as archive:
+        chapter = archive.read("EPUB/chapter-001.xhtml").decode()
+    assert "hyphenation across a source line." in chapter
+    assert "Reviewed source header" not in chapter
+
+
+@pytest.mark.anyio
+async def test_complex_pdf_refuses_before_validation_or_delivery():
+    validator = StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[]))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        pdf_catalog=ApprovedPdfCatalog(entries=(pdf_entry(_two_column_pdf()),)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=validator,
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "unavailable"
+    assert result.reason == (
+        "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+    )
+    assert result.delivery is None
+    assert validator.calls == 0
+
+
+@pytest.mark.anyio
+async def test_rights_denied_pdf_never_enters_pdf_analysis():
+    denied_pdf = replace(
+        pdf_entry(b"this is intentionally not a PDF"),
+        rights_evidence="all_rights_reserved",
+        attribution=None,
+    )
+    validator = StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[]))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        pdf_catalog=ApprovedPdfCatalog(entries=(denied_pdf,)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=validator,
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "unavailable"
+    assert result.reason == "The available source did not pass the demo's rights policy."
+    assert validator.calls == 0
+
+
+@pytest.mark.anyio
+async def test_pdf_layout_refusal_stays_visible_after_a_rights_denied_existing_match():
+    denied_existing = replace(
+        matching_existing_entry(rights_evidence="all_rights_reserved"),
+        work_title="Authorized PDF Source",
+        authors=("Example Author",),
+    )
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=(denied_existing,)),
+        pdf_catalog=ApprovedPdfCatalog(entries=(pdf_entry(_two_column_pdf()),)),
+        acquirer=StubAcquirer(AssertionError("rights-ineligible EPUB must not be acquired")),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "unavailable"
+    assert result.reason == (
+        "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+    )
+
+
+@pytest.mark.anyio
+async def test_pdf_fallback_preserves_a_rejected_structured_source_in_provenance():
+    rejected_structured = replace(
+        structured_entry(
+            b"<html><body><h1>Chapter</h1><img alt='unreviewed image'/></body></html>"
+        ),
+        entry_id="structured:rejected-before-pdf",
+        work_title="Authorized PDF Source",
+        digital_title="Authorized PDF Source",
+        digital_identifier="https://example.invalid/rejected-before-pdf",
+        source_organization="Rejected structured source",
+    )
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        structured_catalog=ApprovedStructuredCatalog(entries=(rejected_structured,)),
+        pdf_catalog=ApprovedPdfCatalog(entries=(pdf_entry(_single_column_pdf()),)),
+        acquirer=StubAcquirer(AssertionError("must not acquire an existing EPUB")),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request("Authorized PDF Source", ["Example Author"]))
+
+    assert result.status == "ready"
+    assert result.provenance.source_attempts == [
+        "Rejected structured source",
+        "Reviewed PDF source",
+    ]
 
 
 @pytest.mark.anyio

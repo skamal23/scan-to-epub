@@ -375,7 +375,7 @@ The app should not “clean up” or repackage a valid source EPUB merely to add
 
 Generation is deliberately narrow. It is allowed only from reviewed HTML, XHTML, XML, plain text, or an eligible text-based PDF whose rights evidence permits redistribution and transformation.
 
-**Current demo boundary:** the implemented structured-source converter accepts only a strict HTML subset and explicitly marked plain text. XML/XHTML declaration handling, eligible PDF conversion, and source-image reuse remain planned extensions; until each has dedicated structural and per-asset rights validation, the app refuses those inputs rather than silently flattening them.
+**Current demo boundary:** the implemented converter accepts a strict HTML subset, explicitly marked plain text, and reviewed PDF snapshots that pass the guarded text/layout gate. XML/XHTML declaration handling and source-image reuse remain planned extensions; until each has dedicated structural and per-asset rights validation, the app refuses those inputs rather than silently flattening them.
 
 The generation process may:
 

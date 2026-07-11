@@ -57,7 +57,7 @@ test('searching state preserves the confirmed physical edition', () => {
   const view = render(<EditionResolutionFlow {...props} state={state} />);
 
   expect(view.getByText('Work confirmed')).toBeTruthy();
-  expect(view.getByText('Checking reviewed sources and preparing an EPUB where needed…')).toBeTruthy();
+  expect(view.getByText('Checking reviewed sources and analyzing a PDF safely where needed…')).toBeTruthy();
   expect(view.getByText('Your physical edition')).toBeTruthy();
   expect(view.getByText('Penguin Classics, 2003')).toBeTruthy();
 });

@@ -4,11 +4,14 @@ import zipfile
 import httpx
 import pytest
 
+import book_backend.editions.fixtures as fixture_module
 from book_backend.app import create_app
 from book_backend.config import Settings
 from book_backend.editions.errors import SourceUnavailable, ValidationFailed
 from book_backend.editions.fixtures import fixture_epub_bytes
 from book_backend.editions.models import EditionResolutionResult
+from book_backend.epubs.generation import StructuredSource
+from book_backend.epubs.generation import generate_epub as real_generate_epub
 from book_backend.epubs.safety import inspect_epub
 from book_backend.epubs.validator import EpubcheckValidator
 
@@ -182,6 +185,100 @@ async def test_fixture_mode_generates_and_delivers_a_test_only_plain_text_epub()
     with zipfile.ZipFile(io.BytesIO(downloaded.content)) as archive:
         chapter = archive.read("EPUB/chapter-001.xhtml").decode()
     assert "This test-only plain-text source verifies deterministic EPUB generation." in chapter
+
+
+@pytest.mark.anyio
+async def test_fixture_mode_analyzes_a_test_only_pdf_and_delivers_a_generated_epub():
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post(
+            "/editions/resolve",
+            json=generated_fixture_request_body(
+                candidate_id="fixture:generated-pdf",
+                title="Authorized PDF Source",
+            ),
+        )
+
+        assert resolved.status_code == 200
+        assert resolved.json()["status"] == "ready"
+        delivery = resolved.json()["delivery"]
+        downloaded = await client.get(
+            delivery["downloadPath"],
+            headers={"Authorization": f"Bearer {delivery['downloadToken']}"},
+        )
+
+    payload = resolved.json()
+    assert payload["provenance"]["generatorVersion"] == "guarded-pdf/1 + structured-epub/1"
+    assert "accounted for 3 PDF body blocks" in payload["provenance"]["transformationSteps"]
+    with zipfile.ZipFile(io.BytesIO(downloaded.content)) as archive:
+        chapter = archive.read("EPUB/chapter-001.xhtml").decode()
+    assert "This test-only PDF source has a reliable text layer." in chapter
+    assert "Test-only PDF header" not in chapter
+
+
+@pytest.mark.anyio
+async def test_fixture_mode_refuses_a_complex_pdf_without_creating_a_delivery():
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post(
+            "/editions/resolve",
+            json=generated_fixture_request_body(
+                candidate_id="fixture:pdf-refused",
+                title="PDF Conversion Refusal",
+            ),
+        )
+
+    payload = resolved.json()
+    assert resolved.status_code == 200
+    assert payload["status"] == "unavailable"
+    assert payload["reason"] == (
+        "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+    )
+    assert payload["delivery"] is None
+
+
+@pytest.mark.anyio
+async def test_fixture_mode_refuses_a_pdf_export_when_generated_text_loses_analyzed_content(
+    monkeypatch,
+):
+    def generate_mismatched_epub(source: StructuredSource, *, generated_at: str):
+        return real_generate_epub(
+            StructuredSource(
+                source_id=source.source_id,
+                canonical_url=source.canonical_url,
+                title=source.title,
+                authors=source.authors,
+                language=source.language,
+                content=(
+                    b"<html><body><h1>Replacement chapter</h1>"
+                    b"<p>Unrelated replacement text.</p></body></html>"
+                ),
+                license_name=source.license_name,
+                license_url=source.license_url,
+                attribution=source.attribution,
+            ),
+            generated_at=generated_at,
+        )
+
+    monkeypatch.setattr(fixture_module, "generate_epub", generate_mismatched_epub)
+    app = create_app(Settings(environment="test", fixture_mode=True))
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        resolved = await client.post(
+            "/editions/resolve",
+            json=generated_fixture_request_body(
+                candidate_id="fixture:generated-pdf",
+                title="Authorized PDF Source",
+            ),
+        )
+
+    assert resolved.status_code == 502
+    assert resolved.json()["detail"] == "The open edition could not be verified"
 
 
 @pytest.mark.anyio

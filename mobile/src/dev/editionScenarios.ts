@@ -229,4 +229,103 @@ export const generatedPlainTextEditionScenario: EditionResolutionResult = {
   },
 };
 
+export const generatedPdfEditionScenarioCandidate: MetadataCandidate = {
+  ...generatedEditionScenarioCandidate,
+  candidateId: 'fixture:generated-pdf',
+  work: {
+    ...generatedEditionScenarioCandidate.work,
+    title: 'Authorized PDF Source',
+    sourceIds: { fixture: 'generated-pdf' },
+  },
+  edition: {
+    ...generatedEditionScenarioCandidate.edition,
+    title: 'Authorized PDF Source',
+    sourceIds: { fixture: 'generated-pdf-edition' },
+  },
+};
+
+export const pdfConversionRefusalScenarioCandidate: MetadataCandidate = {
+  ...generatedPdfEditionScenarioCandidate,
+  candidateId: 'fixture:pdf-refused',
+  work: {
+    ...generatedPdfEditionScenarioCandidate.work,
+    title: 'PDF Conversion Refusal',
+    sourceIds: { fixture: 'pdf-refused' },
+  },
+  edition: {
+    ...generatedPdfEditionScenarioCandidate.edition,
+    title: 'PDF Conversion Refusal',
+    sourceIds: { fixture: 'pdf-refused-edition' },
+  },
+};
+
+export const generatedPdfEditionScenario: EditionResolutionResult = {
+  ...generatedEditionScenario,
+  physicalEdition: {
+    ...generatedEditionScenario.physicalEdition!,
+    candidateId: generatedPdfEditionScenarioCandidate.candidateId,
+    title: generatedPdfEditionScenarioCandidate.work.title,
+    authors: generatedPdfEditionScenarioCandidate.work.authors,
+    publisher: generatedPdfEditionScenarioCandidate.edition.publisher,
+    publishedDate: generatedPdfEditionScenarioCandidate.edition.publishedDate,
+    sourceIds: generatedPdfEditionScenarioCandidate.edition.sourceIds,
+  },
+  digitalEdition: {
+    ...generatedEditionScenario.digitalEdition!,
+    title: 'Authorized PDF Source (test export)',
+    identifier: 'urn:book-to-epub:fixture:generated-pdf',
+  },
+  source: {
+    organization: 'Deterministic PDF fixture',
+    canonicalUrl: 'https://example.invalid/test-only-generated-pdf',
+  },
+  rights: {
+    licenseName: 'Test-only PDF source',
+    licenseUrl: 'https://example.invalid/test-only-generated-pdf',
+    rightsStatement: 'This test-only EPUB is generated from a purpose-built PDF fixture.',
+    attribution: 'Book to EPUB PDF test fixture.',
+    territory: 'US',
+  },
+  provenance: {
+    ...generatedEditionScenario.provenance!,
+    catalogEntryId: 'fixture:generated-pdf',
+    acquisitionUrl: 'https://example.invalid/test-only-generated-pdf',
+    retrievedAt: '2026-07-10T17:00:00Z',
+    originalSha256: 'f'.repeat(64),
+    finalSha256: 'e'.repeat(64),
+    generatorVersion: 'guarded-pdf/1 + structured-epub/1',
+    transformationSteps: [
+      'analyzed authorized PDF with guarded-pdf/1',
+      'accounted for 3 PDF body blocks',
+      'removed 4 classified PDF artifacts',
+      'normalized authorized PDF into HTML',
+      'packaged deterministic EPUB',
+    ],
+  },
+  delivery: {
+    ...generatedEditionScenario.delivery!,
+    filename: 'Authorized-PDF-Source-test-export-Example-Author.epub',
+    sha256: 'e'.repeat(64),
+  },
+};
+
+export const pdfConversionRefusalScenario: EditionResolutionResult = {
+  status: 'unavailable',
+  reason: 'We found an authorized PDF, but could not safely convert its layout into an EPUB.',
+  physicalEdition: {
+    ...generatedPdfEditionScenario.physicalEdition!,
+    candidateId: pdfConversionRefusalScenarioCandidate.candidateId,
+    title: pdfConversionRefusalScenarioCandidate.work.title,
+    authors: pdfConversionRefusalScenarioCandidate.work.authors,
+    publisher: pdfConversionRefusalScenarioCandidate.edition.publisher,
+    publishedDate: pdfConversionRefusalScenarioCandidate.edition.publishedDate,
+    sourceIds: pdfConversionRefusalScenarioCandidate.edition.sourceIds,
+  },
+  digitalEdition: null,
+  source: null,
+  rights: null,
+  provenance: null,
+  delivery: null,
+};
+
 export const editionScenarioCandidate = candidate;
