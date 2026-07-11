@@ -64,7 +64,7 @@ Adopt a four-point rhythm with 24 pt screen gutters on standard phones. The prim
 
 ### Launch
 
-The launch screen remains sparse: the product name, one short prompt, a compact connection indicator, and the scanner action anchored near the lower half. It does not lead with rights/legal language. Development scenarios remain visually secondary and remain absent from production builds.
+The scanner is the default entry screen: opening the app goes directly to camera permission or the camera preview. The fallback launch/home screen is reached only by Back or an actionable recovery path. It remains sparse—the product name, one short scan-oriented prompt, and an open-camera action—and never leads with rights/legal language or a normal online-status message. Development scenarios remain visually secondary and remain absent from production builds.
 
 ### Scanner
 
@@ -84,7 +84,7 @@ Unavailable, source-error, permission, and cover-recovery states follow the same
 
 The normal user-facing path has only the information needed to act:
 
-1. **Scan:** Camera, a short scanner hint, shutter, and manual search.
+1. **Scan:** Camera on app open, a short scanner hint, shutter, and manual search.
 2. **Confirm:** “Is this your book?” and one or a few cover-led choices.
 3. **Open:** The digital book, “Ready to read,” and Open in Books.
 
