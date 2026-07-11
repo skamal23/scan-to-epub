@@ -226,6 +226,12 @@ git commit -m "feat: announce app state changes accessibly"
 
 - Modify: `Makefile`
 - Modify: `README.md`
+- Modify: `.maestro/phase0.yaml`
+- Modify: `.maestro/phase1.yaml`
+- Modify: `.maestro/phase2.yaml`
+- Modify: `.maestro/phase3.yaml`
+- Modify: `.maestro/phase4.yaml`
+- Modify: `.maestro/phase6.yaml`
 - Create: `.maestro/phase9-golden.yaml`
 
 **Interfaces:**
@@ -233,7 +239,7 @@ git commit -m "feat: announce app state changes accessibly"
 - Consumes: the existing phase-specific Maestro flows and `maestro test` against `host.exp.Exponent`.
 - Produces: `make maestro-golden`, a repeatable ordered Expo Go Simulator gate, and a README command sequence that explains the manual system-owned share-sheet check.
 
-- [ ] **Step 1: Create the failing golden-flow manifest**
+- [x] **Step 1: Create the failing golden-flow manifest**
 
 ```yaml
 appId: host.exp.Exponent
@@ -255,31 +261,47 @@ name: Phase 9 Expo Go golden smoke
 
 The manifest deliberately verifies one success/unavailable handoff boundary only; phase-specific files continue to cover their dedicated flows.
 
-- [ ] **Step 2: Run it before adding the Make target**
+- [x] **Step 2: Run it before adding the Make target**
 
 Run: `maestro test .maestro/phase9-golden.yaml`
 
 Expected: the file runs independently against Expo Go once the fixture backend and Metro server are already running.
 
-- [ ] **Step 3: Add the repeatable Make target**
+- [x] **Step 3: Add the repeatable Make target**
 
 ```make
 .PHONY: maestro-golden
 
 maestro-golden:
-	maestro test .maestro/phase0.yaml .maestro/phase1.yaml .maestro/phase2.yaml .maestro/phase3.yaml .maestro/phase4.yaml .maestro/phase5.yaml .maestro/phase6.yaml .maestro/phase7.yaml .maestro/phase8.yaml .maestro/phase8-refusal.yaml .maestro/phase9-golden.yaml
+	maestro test .maestro/phase0.yaml
+	maestro test .maestro/phase1.yaml
+	maestro test .maestro/phase2.yaml
+	maestro test .maestro/phase3.yaml
+	maestro test .maestro/phase4.yaml
+	maestro test .maestro/phase6.yaml
+	maestro test .maestro/phase8.yaml
+	maestro test .maestro/phase8-refusal.yaml
+	maestro test .maestro/phase9-golden.yaml
 ```
 
-Do not include a `tapOn` action that leaves Maestro blocked in the system-owned iOS share sheet. That handoff remains a Computer Use/manual Simulator check.
+Run one flow per Maestro process: passing multiple local flow files to a single command makes Maestro schedule them concurrently, which is unsafe when they share one Simulator. Prefix the older included flows with the same Expo Go launch/project-selection steps already used by Phase 6+, so every flow is independently bootable. Update the Phase 6 fallback assertion to its current user-visible copy.
 
-- [ ] **Step 4: Document and execute the gate**
+Do not include Phase 5 or 7 in this target because they tap into the system-owned iOS share sheet. That handoff remains a Computer Use/manual Simulator check.
 
-Add `make maestro-golden` to README’s Verification section with prerequisites: `make backend-run`, Metro/Expo Go already open in the booted simulator, and a separate physical-phone camera pass. Run the target once, then use Computer Use to verify the generated-PDF native share sheet and the refusal screen at the current Dynamic Type default.
+- [x] **Step 4: Document and execute the app-owned gate**
 
-- [ ] **Step 5: Commit the isolated task**
+Add `make maestro-golden` to README’s Verification section with prerequisites: `make backend-run`, Metro/Expo Go already open in the booted simulator, and a separate physical-phone camera pass. Run the target once.
+
+- [ ] **Step 5: Inspect the system-owned handoff when Computer Use is available**
+
+Use Computer Use to open the generated-PDF scenario, confirm the native iOS share sheet appears at the current default Dynamic Type size, then dismiss it without selecting a destination. Also inspect the PDF-refusal screen. If the Mac is locked, record that limitation and rely on the app-owned Maestro gate until it is unlocked.
+
+- [x] **Step 6: Commit the isolated task**
 
 ```bash
-git add Makefile README.md .maestro/phase9-golden.yaml
+git add Makefile README.md docs/superpowers/plans/2026-07-10-phase-9-expo-go-functional-hardening.md \
+  .maestro/phase0.yaml .maestro/phase1.yaml .maestro/phase2.yaml .maestro/phase3.yaml \
+  .maestro/phase4.yaml .maestro/phase6.yaml .maestro/phase9-golden.yaml
 git commit -m "test: add Expo Go golden flow gate"
 ```
 

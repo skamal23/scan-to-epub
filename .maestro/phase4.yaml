@@ -1,6 +1,8 @@
 appId: host.exp.Exponent
 name: Phase 4 rights-aware edition resolution
 ---
+- launchApp
+- tapOn: Book to EPUB
 - assertVisible: Book to EPUB
 - assertVisible: Backend connected
 - tapOn: Test scenarios

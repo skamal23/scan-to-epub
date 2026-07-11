@@ -119,6 +119,16 @@ make test
 make doctor
 ```
 
+### Expo Go Simulator golden flow
+
+With the fixture backend (`make backend-run`) and Metro/Expo Go already open in a booted iOS Simulator, run:
+
+```bash
+make maestro-golden
+```
+
+This is the repeatable app-owned smoke gate for the deterministic scenarios. It intentionally excludes the older flows that tap into the native iOS share sheet, because that sheet is owned by iOS rather than Expo Go and can leave an automation driver waiting. After the gate, use Computer Use or a manual Simulator check to open the generated-PDF scenario, confirm the native share sheet appears, then dismiss it without choosing a destination. Separately, do a short physical-iPhone Expo Go pass for camera permission, framing, focus, barcode detection, and the final Apple Books/Files choice.
+
 The development-only scenario launcher is controlled by React Native's `__DEV__` flag and is absent from release builds.
 
 Camera framing and focus cannot be validated in iOS Simulator. The automated suite covers the permission, capture-boundary, processing, cancellation, recognition, ambiguity, recovery, and cleanup paths; a short real-camera check in Expo Go is intentionally manual.

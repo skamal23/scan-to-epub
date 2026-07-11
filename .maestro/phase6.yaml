@@ -13,7 +13,7 @@ name: Phase 6 approved-source fallback details
 - tapOn: Open-license fallback details
 - assertVisible: Verified open edition
 - assertVisible: No reusable source cover
-- assertVisible: Checked the next approved source after an earlier edition could not be verified.
+- assertVisible: Checked a later approved path after an earlier option could not be delivered.
 - scrollUntilVisible:
     element:
       text: Why this edition is available

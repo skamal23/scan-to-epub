@@ -1,6 +1,8 @@
 appId: host.exp.Exponent
 name: Phase 1 manual identification flow
 ---
+- launchApp
+- tapOn: Book to EPUB
 - assertVisible: Book to EPUB
 - assertVisible: Backend connected
 - tapOn: Open scanner

@@ -1,6 +1,8 @@
 appId: host.exp.Exponent
 name: Phase 0 foundation flow
 ---
+- launchApp
+- tapOn: Book to EPUB
 - assertVisible: Book to EPUB
 - assertVisible: Backend connected
 - tapOn: Open scanner

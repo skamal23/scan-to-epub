@@ -1,0 +1,18 @@
+appId: host.exp.Exponent
+name: Phase 9 Expo Go golden smoke
+---
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Book to EPUB
+- assertVisible: Backend connected
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: PDF conversion refused
+    direction: DOWN
+- tapOn: PDF conversion refused
+- assertVisible: Book identified, open edition unavailable
+- assertVisible: "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+- assertNotVisible: Open in Books
+- assertNotVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase9-golden-refusal

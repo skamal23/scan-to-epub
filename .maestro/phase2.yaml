@@ -1,6 +1,8 @@
 appId: host.exp.Exponent
 name: Phase 2 ISBN scanner states
 ---
+- launchApp
+- tapOn: Book to EPUB
 - assertVisible: Book to EPUB
 - assertVisible: Backend connected
 - tapOn: Test scenarios
