@@ -16,4 +16,5 @@ name: Phase 10 launch and scanner visuals
 - tapOn: Invalid ISBN
 - assertVisible: Scan a cover or ISBN
 - assertVisible: Search manually
+- assertNotVisible: Cover photos are processed temporarily and not saved.
 - takeScreenshot: .maestro/artifacts/phase10-scanner

@@ -406,9 +406,6 @@ export function ScannerView({
           label="Search manually"
           onPress={onManualSearch}
         />
-        <Text style={styles.privacyHint}>
-          Cover photos are processed temporarily and not saved.
-        </Text>
       </View>
     </SafeAreaView>
   );
@@ -599,7 +596,6 @@ const styles = StyleSheet.create({
   shutterInner: { backgroundColor: '#FFFFFF', borderRadius: radius.pill, height: 42, width: 42 },
   pressed: { opacity: 0.72 },
   disabled: { opacity: 0.45 },
-  privacyHint: { color: colors.evergreenSoft, fontSize: type.eyebrow, lineHeight: 17, textAlign: 'center' },
   progressTrack: {
     backgroundColor: colors.line,
     borderRadius: 3,

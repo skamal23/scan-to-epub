@@ -170,7 +170,7 @@ describe('<ScannerView />', () => {
     );
 
     expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
-    expect(view.getByText('Cover photos are processed temporarily and not saved.')).toBeTruthy();
+    expect(view.queryByText('Cover photos are processed temporarily and not saved.')).toBeNull();
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
 
     expect(captureCover).toHaveBeenCalledTimes(1);
