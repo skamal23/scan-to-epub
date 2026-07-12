@@ -15,6 +15,14 @@ from .content_sources.google_books import (
     GoogleBooksOpenEditionSource,
     HttpGoogleBooksVolumeClient,
 )
+from .content_sources.gutenberg import (
+    HttpProjectGutenbergOpdsClient,
+    ProjectGutenbergOpenEditionSource,
+)
+from .content_sources.standard_ebooks import (
+    HttpStandardEbooksClient,
+    StandardEbooksOpenEditionSource,
+)
 from .cover.comparison import HttpCoverComparator
 from .cover.models import CoverRecognitionResult
 from .cover.ocr import TesseractCoverOcr
@@ -44,6 +52,24 @@ class CoverRecognizer(Protocol):
 
 class EditionResolver(Protocol):
     async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult: ...
+
+
+def _live_dynamic_sources(settings: Settings, user_agent: str) -> tuple[object, ...]:
+    sources: list[object] = [
+        StandardEbooksOpenEditionSource(
+            client=HttpStandardEbooksClient(user_agent=user_agent),
+        ),
+        ProjectGutenbergOpenEditionSource(
+            client=HttpProjectGutenbergOpdsClient(user_agent=user_agent),
+        ),
+    ]
+    if settings.google_books_api_key:
+        sources.append(
+            GoogleBooksOpenEditionSource(
+                client=HttpGoogleBooksVolumeClient(settings.google_books_api_key)
+            )
+        )
+    return tuple(sources)
 
 
 def _cover_content_length(request: Request) -> int | None:
@@ -97,19 +123,12 @@ def create_app(
                 if settings.contact_email
                 else "BookToEPUB/0.1"
             )
-            dynamic_sources = ()
-            if settings.google_books_api_key:
-                dynamic_sources = (
-                    GoogleBooksOpenEditionSource(
-                        client=HttpGoogleBooksVolumeClient(settings.google_books_api_key)
-                    ),
-                )
             edition_service = EditionResolutionService(
                 catalog=APPROVED_EPUB_CATALOG,
                 acquirer=SafeEpubAcquirer(HttpEpubFetcher(user_agent=user_agent)),
                 validator=EpubcheckValidator(),
                 artifact_store=epub_store,
-                dynamic_sources=dynamic_sources,
+                dynamic_sources=_live_dynamic_sources(settings, user_agent),
                 structured_catalog=APPROVED_STRUCTURED_CATALOG,
                 pdf_catalog=APPROVED_PDF_CATALOG,
             )

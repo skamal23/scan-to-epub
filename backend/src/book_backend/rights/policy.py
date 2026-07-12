@@ -16,6 +16,7 @@ RightsEvidence = Literal[
     "borrowed",
     "sample",
     "drm",
+    "source_authorized_distribution",
 ]
 UseKind = Literal["existing_epub", "generated_epub"]
 RightsOutcome = Literal["deliver", "generate", "source_only", "reject"]
@@ -49,6 +50,13 @@ def decide_rights(
         return RightsDecision(
             "deliver" if use_kind == "existing_epub" else "generate",
             requires_attribution=True,
+        )
+    if evidence == "source_authorized_distribution":
+        if use_kind == "existing_epub":
+            return RightsDecision("deliver", requires_attribution=True)
+        return RightsDecision(
+            "reject",
+            reason="The source authorizes distribution of its unchanged file only.",
         )
     if evidence == "free_to_read":
         return RightsDecision("source_only", reason="Reuse permission is not established.")

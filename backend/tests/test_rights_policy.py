@@ -20,6 +20,7 @@ from book_backend.rights.policy import decide_rights
         ("borrowed", "reject", "reject"),
         ("sample", "reject", "reject"),
         ("drm", "reject", "reject"),
+        ("source_authorized_distribution", "deliver", "reject"),
     ],
 )
 def test_rights_policy_is_explicit_and_fail_closed(evidence, existing, generated):
@@ -38,3 +39,12 @@ def test_rights_policy_rejects_wrong_territory_and_sharealike_without_compliance
 def test_rights_policy_requires_attribution_for_by_licenses():
     assert decide_rights("cc_by", "existing_epub", "US").requires_attribution is True
     assert decide_rights("cc0", "existing_epub", "US").requires_attribution is False
+
+
+def test_source_authorized_distribution_only_allows_the_unchanged_source_file():
+    existing = decide_rights("source_authorized_distribution", "existing_epub", "US")
+    generated = decide_rights("source_authorized_distribution", "generated_epub", "US")
+
+    assert existing.outcome == "deliver"
+    assert existing.requires_attribution is True
+    assert generated.outcome == "reject"
