@@ -44,9 +44,9 @@ pnpm ios
 BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backend-run-live
 ```
 
-Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. Google Books is enabled only when its API key is configured; that key also enables the separate, strict Google public-domain EPUB resolver.
+Live searches use a short successful-result cache, respect Open Library's published request rate, and fall back to the remaining provider when one catalog fails. EPUB resolution dynamically queries the public Standard Ebooks catalog and Project Gutenberg's official OPDS catalog for every confirmed work; it is not limited to a checked-in list of titles. Google Books is enabled only when its API key is configured; that key also enables the separate, strict Google public-domain EPUB resolver.
 
-Fixture mode is for automation only. Its unchanged-download fixture is explicitly labeled **Deterministic test fixture** and contains no source-book text. The development-only scenario launcher also provides **Generated test EPUB** and **Generated plain-text EPUB**: both run the real deterministic generation, EPUBCheck, delivery-token, and native export path using purpose-built test text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it downloads one of the reviewed Standard Ebooks editions, checks its pinned SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
+Fixture mode is for automation only. Its unchanged-download fixture is explicitly labeled **Deterministic test fixture** and contains no source-book text. The development-only scenario launcher also provides **Generated test EPUB** and **Generated plain-text EPUB**: both run the real deterministic generation, EPUBCheck, delivery-token, and native export path using purpose-built test text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it discovers a matching Standard Ebooks or Project Gutenberg edition at runtime, downloads the source EPUB, computes its SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
 
 ### Expo Go on a physical iPhone
 
@@ -76,13 +76,13 @@ For the actual legal-book handoff on a phone, prefer `make backend-run-phone-liv
 
 The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_API_URL`. The checked-in [render.yaml](./render.yaml) describes a reproducible development deployment for that path. Creating the hosted service is intentionally deferred until a remotely reachable backend is needed.
 
-## Approved source behavior
+## Open source behavior
 
-- **Standard Ebooks** remains the first reviewed source for its curated public-domain/CC0 editions. Each enabled file has a pinned SHA-256 and does not permit redirects.
+- **Standard Ebooks** is the first live source. The backend searches its public XHTML catalog, confirms title and author locally, reads the canonical book page, and selects the compatible EPUB. Results are cached briefly. The five hash-pinned records remain only as network-failure fallbacks and do not limit coverage.
 - **OAPEN** has a reviewed CC BY EPUB path. The backend checks the OAPEN host, the file's pinned SHA-256, the OAPEN-supplied MD5, container safety, and EPUBCheck before delivery. If OAPEN does not authorize a reusable cover, the app deliberately shows a neutral placeholder.
 - **DOAB** is treated as a discovery directory, not a file host. Its reviewed record is retained separately from the final OAPEN file so provenance never implies that DOAB served the EPUB.
 - **Google Books** is considered only when its API response says `US`, `FULL_PUBLIC_DOMAIN`, `publicDomain: true`, `ALL_PAGES`, and supplies a non-ACS EPUB download. Samples, account-bound downloads, partial views, and non-Google download hosts are rejected. Its download may make one explicitly allowlisted Google-host redirect; the resulting file is still inspected and EPUBCheck-validated.
-- **Project Gutenberg** is never scraped from its main website at runtime. Its adapter accepts only a separately configured, reviewed HTTPS mirror/harvest manifest with pinned file hashes, preserving the included Project Gutenberg license. It is intentionally disabled until such a mirror is provisioned.
+- **Project Gutenberg** is queried through its official OPDS interface, which Project Gutenberg documents for machine-to-machine catalog discovery. The adapter confirms title and author, prefers EPUB3 with images, follows at most one same-host redirect to the generated file, and preserves the included Project Gutenberg license. Project Gutenberg generates EPUBs for textual catalog records; non-text records such as audio or datasets are outside this book-to-EPUB flow.
 
 The resolver automatically selects the highest-priority approved edition. When an existing EPUB cannot be legally delivered or verified, it can try the next distinct reviewed EPUB, an eligible reviewed structured source, and then a guarded reviewed PDF snapshot; it records that source sequence in the provenance details. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
 
@@ -117,6 +117,12 @@ Complex layouts and scans fail closed with “We found an authorized PDF, but co
 ```bash
 make test
 make doctor
+```
+
+To repeat live source verification against titles outside the curated fallback, including real downloads, archive inspection, SHA-256, and EPUBCheck:
+
+```bash
+.venv/bin/python backend/scripts/live_catalog_smoke.py
 ```
 
 ### Expo Go Simulator golden flow

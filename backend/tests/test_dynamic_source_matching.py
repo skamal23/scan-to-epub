@@ -6,6 +6,14 @@ def test_title_matching_handles_punctuation_diacritics_and_subtitles():
     assert title_match_score("Jane Eyre", "Jane Eyre: An Autobiography") >= 0.9
     assert title_match_score("The Man Who Was Thursday", "The Man Who Was Thursday") == 1.0
     assert title_match_score("À rebours", "A Rebours") == 1.0
+    assert (
+        title_match_score(
+            "Narrative of the Life of Frederick Douglass",
+            "Narrative of the Life of Frederick Douglass, an American Slave",
+        )
+        >= 0.9
+    )
+    assert title_match_score("Walden", "Walden, and On The Duty Of Civil Disobedience") >= 0.9
 
 
 def test_title_matching_rejects_partial_title_collisions():

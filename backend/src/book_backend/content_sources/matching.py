@@ -19,8 +19,8 @@ def title_match_score(query: str, candidate: str) -> float:
     if query_words == candidate_words:
         return 1.0
 
-    query_core = normalized_words(re.split(r"\s*(?:[:;]|--|—)\s*", query, maxsplit=1)[0])
-    candidate_core = normalized_words(re.split(r"\s*(?:[:;]|--|—)\s*", candidate, maxsplit=1)[0])
+    query_core = normalized_words(re.split(r"\s*(?:[:,;]|--|—)\s*", query, maxsplit=1)[0])
+    candidate_core = normalized_words(re.split(r"\s*(?:[:,;]|--|—)\s*", candidate, maxsplit=1)[0])
     if query_core == candidate_core:
         return 0.95
 
