@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 from datetime import UTC, datetime
 from typing import Protocol
@@ -286,22 +287,27 @@ class EditionResolutionService:
             request.work_authors,
             request.physical_isbn13,
         )
-        if static_entries:
-            return static_entries
-
         entries: list[ApprovedEpubEntry] = []
         source_failure: SourceUnavailable | None = None
-        for source in self.dynamic_sources:
-            try:
-                entries.extend(
-                    await source.find_all(
-                        request.work_title,
-                        request.work_authors,
-                        request.physical_isbn13,
-                    )
+        outcomes = await asyncio.gather(
+            *(
+                source.find_all(
+                    request.work_title,
+                    request.work_authors,
+                    request.physical_isbn13,
                 )
-            except SourceUnavailable as error:
-                source_failure = error
+                for source in self.dynamic_sources
+            ),
+            return_exceptions=True,
+        )
+        for outcome in outcomes:
+            if isinstance(outcome, SourceUnavailable):
+                source_failure = outcome
+            elif isinstance(outcome, BaseException):
+                raise outcome
+            else:
+                entries.extend(outcome)
+        entries.extend(static_entries)
         if entries:
             return _distinct_by_digital_identifier(entries)
         if source_failure is not None:

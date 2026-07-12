@@ -851,3 +851,30 @@ async def test_dynamic_approved_source_is_used_when_the_reviewed_static_catalog_
     ]
     assert result.status == "ready"
     assert result.source.organization == "OAPEN"
+
+
+@pytest.mark.anyio
+async def test_live_dynamic_entry_refreshes_the_matching_static_fallback():
+    payload = epub_bytes()
+    static = with_payload_hash(STANDARD_EBOOKS_CATALOG.entries[0], payload)
+    live = replace(
+        static,
+        source_organization="Live Standard Ebooks",
+        reviewed_at="2026-07-11",
+        download_policy=replace(static.download_policy, expected_sha256=None),
+    )
+    source = DynamicCatalog((live,))
+    acquirer = StubAcquirer(payload)
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=(static,)),
+        dynamic_sources=(source,),
+        acquirer=acquirer,
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert source.requests == [("Pride and Prejudice", ["Jane Austen"], "9780141439518")]
+    assert acquirer.entries == [live]
+    assert result.source.organization == "Live Standard Ebooks"
