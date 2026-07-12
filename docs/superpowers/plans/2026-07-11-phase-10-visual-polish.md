@@ -277,21 +277,21 @@ git commit -m "feat: polish book search and confirmation"
 - Consumes: `EditionState`, `ExportState`, rights/provenance data, export callbacks, and Task 1 UI primitives.
 - Produces: unchanged ready, generated, unavailable, source-error, download, share, and provenance behavior with an editorial result hierarchy, a minimal ready-to-open main path, a neutral Details disclosure, and a readable recovery composition.
 
-- [ ] **Step 1: Add failure-first UI contract tests**
+- [x] **Step 1: Add failure-first UI contract tests**
 
 Add tests asserting that the ready screen keeps the digital title as the polite live region, uses a concise ready outcome, maintains the primary Books and secondary Files action order, retains the alert role for unavailable/export errors, and keeps the neutral Details toggle as an individually reachable button. Assert that source/license/transformation copy is absent until Details opens. Add style-level checks that the details card has `backgroundColor: colors.surface`, `borderColor: colors.line`, and `borderRadius: radius.card`; the missing border contract fails before the screen is polished.
 
-- [ ] **Step 2: Run the focused tests to verify the new contracts fail**
+- [x] **Step 2: Run the focused tests to verify the new contracts fail**
 
 Run: `cd mobile && pnpm test -- EditionResolutionFlow.test.tsx`
 
 Expected: new token/structure assertions fail before the edition screen consumes the foundation.
 
-- [ ] **Step 3: Apply the result and recovery design**
+- [x] **Step 3: Apply the result and recovery design**
 
 Use `Entrance` for the ready card and centered recovery content. Make the cover/title card the hero, use a concise ready outcome, make the primary export action singular, and put provenance, license, validation, transformation, and edition-difference evidence inside a quiet surfaced Details card. Apply the same minimal centered hierarchy to unavailable, source-error, incomplete-result, download, sharing, and export-error states. Do not add a native reader or ask the user to choose a conversion path: authorized structured text/PDF already resolves to the same EPUB export result. Do not animate share-sheet state, download percentage, or the disclosure toggle.
 
-- [ ] **Step 4: Run focused and end-to-end validation**
+- [x] **Step 4: Run focused and end-to-end validation**
 
 Run: `cd mobile && pnpm test -- EditionResolutionFlow.test.tsx App.test.tsx && pnpm typecheck`, then each command separately:
 
@@ -304,7 +304,7 @@ maestro test .maestro/phase8-refusal.yaml
 
 Expected: verified, unavailable, fallback, generated EPUB, guarded PDF, and PDF-refusal outcomes retain all existing action/no-action guarantees.
 
-- [ ] **Step 5: Commit the edition slice**
+- [x] **Step 5: Commit the edition slice**
 
 ```bash
 git add mobile/src/screens/EditionResolutionFlow.tsx mobile/src/screens/__tests__/EditionResolutionFlow.test.tsx
@@ -325,21 +325,21 @@ git commit -m "feat: polish edition and export states"
 - Consumes: the already independent Maestro flows, Expo Go fixture backend, and visual screenshot artifacts.
 - Produces: `make maestro-visual`, documented visual-gate prerequisites, and a finished Phase 10 checklist.
 
-- [ ] **Step 1: Write the Phase 10 visual gate**
+- [x] **Step 1: Write the Phase 10 visual gate**
 
 Create a focused flow that captures the polished launch, scanner, candidate, ready, long-title, and refusal screens without tapping into the native share sheet. It must launch Expo Go before each stateful subflow or use existing independently bootable phase files in separate Make recipe lines.
 
-- [ ] **Step 2: Run the visual gate before wiring the Make target**
+- [x] **Step 2: Run the visual gate before wiring the Make target**
 
 Run: `maestro test .maestro/phase10-visual.yaml`
 
 Expected: the independent visual flow passes against the fixture backend and leaves the required screenshot artifacts before it is folded into a reusable Make target.
 
-- [ ] **Step 3: Add the serial visual target and documentation**
+- [x] **Step 3: Add the serial visual target and documentation**
 
 Add a `.PHONY` `maestro-visual` target that runs the Phase 10 visual flow and the existing independent Phase 0/1/3/4/8/refusal flows one process at a time. Document that it requires `make backend-run`, Metro/Expo Go in the booted Simulator, and that native share-sheet/physical-camera verification remains separate.
 
-- [ ] **Step 4: Run the complete acceptance suite**
+- [x] **Step 4: Run the complete acceptance suite**
 
 Run, from the worktree root:
 
@@ -354,11 +354,13 @@ git diff --check
 
 Use Computer Use when the Mac is unlocked to inspect the launch, scanner, candidate, ready, long-title, unavailable, Details, and native-share-sheet states at default Dynamic Type. Confirm that the default scan → confirm → open path has no unnecessary legal/process copy. Repeat at a large Dynamic Type setting and with Reduce Motion enabled; record any iOS-system-owned limitation in the plan.
 
+> **Verification note (2026-07-11):** Final runs passed: `make test` (217 backend tests; 22 mobile suites / 129 tests), `make doctor` (18/18 checks), `pnpm exec expo export --platform ios`, `make maestro-golden`, `make maestro-visual`, and `git diff --check`. The visual gate refreshed `phase3-strong.png` and captures the scanner, fallback home, confirmation, ready, Details, long-title, unavailable, and PDF-refusal states without entering the native share sheet. An earlier visual aggregate hit an Expo Go/XCTest snapshot timeout while the project bundle was loading; the exact fresh standalone Phase 8 and refusal retries passed, then the final aggregate visual gate passed. Computer Use was unlocked and inspected default-size app-owned refusal/scanner surfaces; the desktop state changed externally during review, so no competing interaction continued. Dynamic Type and Reduce Motion were not toggled because they are iOS system-setting changes requiring separate user confirmation. Physical camera and native Books/Files destination selection remain manual checks.
+
 - [ ] **Step 5: Request an adversarial review and address findings**
 
 Ask an independent reviewer to inspect the final Phase 10 diff for visual regressions, accessibility regressions, unnecessary dependencies, animation misuse, hard-coded duplicate tokens, and accidental behavior changes. Fix every Critical/Important finding, then rerun the commands from Step 4.
 
-- [ ] **Step 6: Commit the completed phase**
+- [x] **Step 6: Commit the completed phase**
 
 ```bash
 git add .maestro/phase10-visual.yaml Makefile README.md docs/superpowers/plans/2026-07-11-phase-10-visual-polish.md

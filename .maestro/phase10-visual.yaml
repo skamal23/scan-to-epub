@@ -1,0 +1,108 @@
+appId: host.exp.Exponent
+name: Phase 10 polished visual states
+---
+# Camera-first shell and the deliberately quiet fallback home.
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- takeScreenshot: .maestro/artifacts/phase10-visual-scanner
+- tapOn: Back
+- assertVisible: Book to EPUB
+- assertVisible: Scan a book to get started.
+- takeScreenshot: .maestro/artifacts/phase10-visual-home
+
+# Cover recognition reaches a minimal, cover-led confirmation state without
+# exercising a physical camera.
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: "Cover: strong match"
+    direction: DOWN
+- tapOn: "Cover: strong match"
+- assertVisible: Scan a cover or ISBN
+- tapOn: Capture cover or detected ISBN
+- assertVisible: Is this your book?
+- assertVisible: Choose Pride and Prejudice by Jane Austen
+- takeScreenshot: .maestro/artifacts/phase10-visual-candidate
+
+# A fresh Expo Go launch keeps the ready state independent of confirmation.
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- tapOn: Back
+- assertVisible: Book to EPUB
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Verified open edition
+    direction: DOWN
+- tapOn: Verified open edition
+- assertVisible: Ready to read
+- assertVisible: Open in Books
+- assertVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase10-visual-ready
+- scrollUntilVisible:
+    element:
+      text: Details
+    direction: DOWN
+- tapOn: Details
+- assertVisible: Test-only artifact
+- takeScreenshot: .maestro/artifacts/phase10-visual-details
+
+# A long title remains readable in the confirmation card.
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- tapOn: Back
+- assertVisible: Book to EPUB
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Long title and no cover
+    direction: DOWN
+- tapOn: Long title and no cover
+- assertVisible: Is this your book?
+- assertVisible: Choose The Extremely Long and Unexpectedly Detailed Book Title That Must Still Fit on a Small Screen by Alexandra Example-With-A-Very-Long-Name
+- takeScreenshot: .maestro/artifacts/phase10-visual-long-title
+
+# Unavailable stays a compact recovery state with no export action.
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- tapOn: Back
+- assertVisible: Book to EPUB
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: Open edition unavailable
+    direction: DOWN
+- tapOn: Open edition unavailable
+- assertVisible: No open edition available
+- assertVisible: Try another book or come back later.
+- assertNotVisible: Open in Books
+- assertNotVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase10-visual-unavailable
+
+# The guarded-PDF refusal must remain honest and app-owned; this flow never
+# opens the native iOS share sheet.
+- launchApp
+- tapOn: Book to EPUB
+- assertVisible: Scan a cover or ISBN
+- assertVisible: Search manually
+- tapOn: Back
+- assertVisible: Book to EPUB
+- tapOn: Test scenarios
+- scrollUntilVisible:
+    element:
+      text: PDF conversion refused
+    direction: DOWN
+- tapOn: PDF conversion refused
+- assertVisible: No open edition available
+- assertVisible: Try another book or come back later.
+- assertNotVisible: Open in Books
+- assertNotVisible: Save to Files
+- takeScreenshot: .maestro/artifacts/phase10-visual-pdf-refusal

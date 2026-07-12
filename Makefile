@@ -1,7 +1,7 @@
 PYTHON ?= .venv/bin/python
 PNPM ?= pnpm
 
-.PHONY: backend-install backend-run backend-run-live backend-run-phone backend-run-phone-live backend-test doctor maestro-golden mobile-install mobile-test test
+.PHONY: backend-install backend-run backend-run-live backend-run-phone backend-run-phone-live backend-test doctor maestro-golden maestro-visual mobile-install mobile-test test
 
 backend-install:
 	$(PYTHON) -m pip install -e './backend[dev]'
@@ -46,3 +46,12 @@ maestro-golden:
 	maestro test .maestro/phase8.yaml
 	maestro test .maestro/phase8-refusal.yaml
 	maestro test .maestro/phase9-golden.yaml
+
+maestro-visual:
+	maestro test .maestro/phase10-visual.yaml
+	maestro test .maestro/phase0.yaml
+	maestro test .maestro/phase1.yaml
+	maestro test .maestro/phase3.yaml
+	maestro test .maestro/phase4.yaml
+	maestro test .maestro/phase8.yaml
+	maestro test .maestro/phase8-refusal.yaml

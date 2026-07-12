@@ -129,6 +129,23 @@ make maestro-golden
 
 This is the repeatable app-owned smoke gate for the deterministic scenarios. It intentionally excludes the older flows that tap into the native iOS share sheet, because that sheet is owned by iOS rather than Expo Go and can leave an automation driver waiting. After the gate, use Computer Use or a manual Simulator check to open the generated-PDF scenario, confirm the native share sheet appears, then dismiss it without choosing a destination. Separately, do a short physical-iPhone Expo Go pass for camera permission, framing, focus, barcode detection, and the final Apple Books/Files choice.
 
+### Expo Go Simulator visual gate
+
+Start the fixture backend in one terminal and Metro in another, then make sure the **Book to EPUB** project is already open in Expo Go on a booted iOS Simulator:
+
+```bash
+make backend-run
+cd mobile && pnpm ios
+```
+
+From the repository root, run:
+
+```bash
+make maestro-visual
+```
+
+This serial gate saves stable screenshots for the camera shell and fallback home, confirmation, ready, long-title, unavailable, Details, and guarded-PDF-refusal states. Each Maestro flow runs in its own process because they share one Simulator. It deliberately never taps into the native iOS share sheet and makes no physical-camera claim. Check camera framing/focus/barcode behavior on a real iPhone in Expo Go, and manually confirm the Apple Books and Files destinations from a ready EPUB after the automated gate.
+
 The development-only scenario launcher is controlled by React Native's `__DEV__` flag and is absent from release builds.
 
 Camera framing and focus cannot be validated in iOS Simulator. The automated suite covers the permission, capture-boundary, processing, cancellation, recognition, ambiguity, recovery, and cleanup paths; a short real-camera check in Expo Go is intentionally manual.

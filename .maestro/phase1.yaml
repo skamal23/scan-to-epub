@@ -14,10 +14,12 @@ name: Phase 1 manual identification flow
 - assertVisible: Is this your book?
 - assertVisible: Choose Pride and Prejudice by Jane Austen
 - tapOn: Choose Pride and Prejudice by Jane Austen
-- assertVisible: Work confirmed
-- assertVisible: Your physical edition
-- assertVisible: The open digital edition may differ.*
-- assertVisible: Verified open edition
+- assertVisible: Ready to read
+- assertVisible: Open in Books
+- assertVisible: Save to Files
+- assertVisible: Details
+- assertNotVisible: Your physical edition
+- assertNotVisible: The open digital edition may differ.*
 - takeScreenshot: .maestro/artifacts/phase1-confirmed
 - scrollUntilVisible:
     element:

@@ -12,8 +12,8 @@ name: Phase 9 Expo Go golden smoke
       text: PDF conversion refused
     direction: DOWN
 - tapOn: PDF conversion refused
-- assertVisible: Book identified, open edition unavailable
-- assertVisible: "We found an authorized PDF, but could not safely convert its layout into an EPUB."
+- assertVisible: No open edition available
+- assertVisible: Try another book or come back later.
 - assertNotVisible: Open in Books
 - assertNotVisible: Save to Files
 - takeScreenshot: .maestro/artifacts/phase9-golden-refusal
