@@ -19,10 +19,13 @@ from .content_sources.gutenberg import (
     HttpProjectGutenbergOpdsClient,
     ProjectGutenbergOpenEditionSource,
 )
+from .content_sources.oapen_live import HttpOapenClient, OapenOpenEditionSource
 from .content_sources.standard_ebooks import (
     HttpStandardEbooksClient,
     StandardEbooksOpenEditionSource,
 )
+from .content_sources.unglue import HttpUnglueOpdsClient, UnglueOpenEditionSource
+from .content_sources.wikisource import HttpWikisourceClient, WikisourceOpenEditionSource
 from .cover.comparison import HttpCoverComparator
 from .cover.models import CoverRecognitionResult
 from .cover.ocr import TesseractCoverOcr
@@ -61,6 +64,15 @@ def _live_dynamic_sources(settings: Settings, user_agent: str) -> tuple[object, 
         ),
         ProjectGutenbergOpenEditionSource(
             client=HttpProjectGutenbergOpdsClient(user_agent=user_agent),
+        ),
+        WikisourceOpenEditionSource(
+            client=HttpWikisourceClient(user_agent=user_agent),
+        ),
+        UnglueOpenEditionSource(
+            client=HttpUnglueOpdsClient(user_agent=user_agent),
+        ),
+        OapenOpenEditionSource(
+            client=HttpOapenClient(user_agent=user_agent),
         ),
     ]
     if settings.google_books_api_key:

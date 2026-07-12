@@ -32,6 +32,51 @@ def test_safe_epub_container_is_inspected_without_extraction():
     assert result.package_path == "EPUB/content.opf"
 
 
+def test_standard_idpf_font_obfuscation_is_not_misclassified_as_drm():
+    encryption = """
+    <encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"
+      xmlns:enc="http://www.w3.org/2001/04/xmlenc#">
+      <enc:EncryptedData>
+        <enc:EncryptionMethod Algorithm="http://www.idpf.org/2008/embedding" />
+        <enc:CipherData><enc:CipherReference URI="EPUB/fonts/body.ttf" /></enc:CipherData>
+      </enc:EncryptedData>
+    </encryption>
+    """
+
+    result = inspect_epub(
+        epub_bytes(
+            [
+                ("META-INF/encryption.xml", encryption),
+                ("EPUB/fonts/body.ttf", b"obfuscated-font-data"),
+            ]
+        )
+    )
+
+    assert result.entry_count == 5
+
+
+@pytest.mark.parametrize(
+    ("algorithm", "uri"),
+    [
+        ("http://www.w3.org/2001/04/xmlenc#aes256-cbc", "EPUB/fonts/body.ttf"),
+        ("http://www.idpf.org/2008/embedding", "EPUB/chapter.xhtml"),
+    ],
+)
+def test_encryption_xml_still_rejects_drm_or_non_font_targets(algorithm, uri):
+    encryption = f'''
+    <encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"
+      xmlns:enc="http://www.w3.org/2001/04/xmlenc#">
+      <enc:EncryptedData>
+        <enc:EncryptionMethod Algorithm="{algorithm}" />
+        <enc:CipherData><enc:CipherReference URI="{uri}" /></enc:CipherData>
+      </enc:EncryptedData>
+    </encryption>
+    '''
+
+    with pytest.raises(InvalidEpub, match="encrypted"):
+        inspect_epub(epub_bytes([("META-INF/encryption.xml", encryption), (uri, b"data")]))
+
+
 @pytest.mark.parametrize(
     ("payload", "message"),
     [

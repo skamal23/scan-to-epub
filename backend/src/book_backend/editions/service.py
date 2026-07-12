@@ -1,4 +1,3 @@
-import asyncio
 import hashlib
 from datetime import UTC, datetime
 from typing import Protocol
@@ -100,29 +99,60 @@ class EditionResolutionService:
 
     async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult:
         source_unavailable: SourceUnavailable | None = None
-        try:
-            entries = await self._find_entries(request)
-        except SourceUnavailable as error:
-            # A reviewed structured snapshot may still provide a fully local,
-            # rights-cleared fallback when dynamic EPUB discovery is offline.
-            entries = ()
-            source_unavailable = error
         validation_failed: ValidationFailed | None = None
         rights_eligible = False
+        found_entries = False
         source_attempts: list[str] = []
-        for entry in entries:
-            if entry.source_organization not in source_attempts:
-                source_attempts.append(entry.source_organization)
-            decision = decide_rights(entry.rights_evidence, "existing_epub", request.territory)
-            if decision.outcome != "deliver":
-                continue
-            rights_eligible = True
+        attempted_identifiers: set[str] = set()
+
+        async def try_entries(
+            entries: tuple[ApprovedEpubEntry, ...],
+        ) -> EditionResolutionResult | None:
+            nonlocal found_entries, rights_eligible, source_unavailable, validation_failed
+            for entry in _distinct_by_digital_identifier(list(entries)):
+                identifier = entry.digital_identifier.rstrip("/").casefold()
+                if identifier in attempted_identifiers:
+                    continue
+                attempted_identifiers.add(identifier)
+                found_entries = True
+                if entry.source_organization not in source_attempts:
+                    source_attempts.append(entry.source_organization)
+                decision = decide_rights(entry.rights_evidence, "existing_epub", request.territory)
+                if decision.outcome != "deliver":
+                    continue
+                rights_eligible = True
+                try:
+                    return await self._deliver(entry, request, source_attempts)
+                except SourceUnavailable as error:
+                    source_unavailable = error
+                except ValidationFailed as error:
+                    validation_failed = error
+            return None
+
+        # Dynamic sources are deliberately lazy and ordered. A later source is
+        # never contacted once an earlier source yields a verified EPUB.
+        for source in self.dynamic_sources:
             try:
-                return await self._deliver(entry, request, source_attempts)
+                entries = await source.find_all(
+                    request.work_title,
+                    request.work_authors,
+                    request.physical_isbn13,
+                )
             except SourceUnavailable as error:
                 source_unavailable = error
-            except ValidationFailed as error:
-                validation_failed = error
+                continue
+            result = await try_entries(entries)
+            if result is not None:
+                return result
+
+        static_entries = self.catalog.find_all(
+            request.work_title,
+            request.work_authors,
+            request.physical_isbn13,
+        )
+        result = await try_entries(static_entries)
+        if result is not None:
+            return result
 
         fallback_validation_failed: ValidationFailed | None = None
         try:
@@ -156,7 +186,7 @@ class EditionResolutionService:
             raise validation_failed
         if source_unavailable is not None:
             raise source_unavailable
-        if entries and not rights_eligible:
+        if found_entries and not rights_eligible:
             return EditionResolutionResult(
                 status="unavailable",
                 reason="The available source did not pass the demo's rights policy.",
@@ -280,39 +310,6 @@ class EditionResolutionService:
             ),
             physical_edition=_physical_edition(request),
         )
-
-    async def _find_entries(self, request: EditionResolveRequest) -> tuple[ApprovedEpubEntry, ...]:
-        static_entries = self.catalog.find_all(
-            request.work_title,
-            request.work_authors,
-            request.physical_isbn13,
-        )
-        entries: list[ApprovedEpubEntry] = []
-        source_failure: SourceUnavailable | None = None
-        outcomes = await asyncio.gather(
-            *(
-                source.find_all(
-                    request.work_title,
-                    request.work_authors,
-                    request.physical_isbn13,
-                )
-                for source in self.dynamic_sources
-            ),
-            return_exceptions=True,
-        )
-        for outcome in outcomes:
-            if isinstance(outcome, SourceUnavailable):
-                source_failure = outcome
-            elif isinstance(outcome, BaseException):
-                raise outcome
-            else:
-                entries.extend(outcome)
-        entries.extend(static_entries)
-        if entries:
-            return _distinct_by_digital_identifier(entries)
-        if source_failure is not None:
-            raise source_failure
-        return ()
 
     async def _deliver(
         self,

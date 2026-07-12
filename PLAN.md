@@ -258,6 +258,8 @@ The source resolver is an allowlisted adapter system. A generic web search is ne
 |---|---|---|---|
 | Standard Ebooks | Preferred source for polished classics | Existing EPUB | U.S. public-domain scope; preserve its edition and provenance |
 | Project Gutenberg | Broad public-domain fallback | Existing EPUB, or selected HTML/text for deterministic conversion | U.S. territory; use official catalog/feed and respectful direct-download behavior |
+| Wikisource | Proofread public-domain/open texts | Existing official WS Export EPUB | Require a complete/exportable work, matching author, CC BY-SA attribution, and a valid export |
+| Unglue.it | Open-license aggregation | Existing Unglue-hosted EPUB | Accept only PD-US, CC0, CC BY, or CC BY-SA; reject NC/ND and arbitrary redirect hosts |
 | Google Books | Metadata plus limited public-domain acquisition | EPUB, or eligible text-based PDF as a conversion source | Require `FULL_PUBLIC_DOMAIN`, country match, and an actual download link |
 | OAPEN | Modern open-access scholarly books | Existing EPUB or eligible text-based PDF bitstream | Require an explicit acceptable license and matching record/file |
 | DOAB | Discovery directory for open-access books | Publisher/OAPEN EPUB or eligible text-based PDF linked from a record | Re-check the item license and final content host; DOAB itself does not host the file |
@@ -276,7 +278,6 @@ DOAB records carry license information and download URLs but DOAB is a directory
 
 ### 7.2 Sources reserved for later evaluation
 
-- **Wikisource WS Export:** technically provides EPUB export, but the relationship among site licensing, transcription rights, underlying work status, and territory needs a separate policy.
 - **Pressbooks Directory:** contains valuable open educational resources and EPUB exports, but books span the full license spectrum and are hosted across many independent networks.
 - **SciELO Books:** offers OPDS and EPUB/PDF, but much of the catalog uses noncommercial licenses and requires territory/language expansion.
 - **OpenStax:** currently emphasizes web, PDF, and DOCX rather than EPUB, and its 2026 licensing transition to CC BY-NC-SA complicates future monetization.

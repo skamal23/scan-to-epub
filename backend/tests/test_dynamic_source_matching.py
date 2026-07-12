@@ -14,6 +14,7 @@ def test_title_matching_handles_punctuation_diacritics_and_subtitles():
         >= 0.9
     )
     assert title_match_score("Walden", "Walden, and On The Duty Of Civil Disobedience") >= 0.9
+    assert title_match_score("The Time Machine", "The Time Machine (Holt text)") >= 0.9
 
 
 def test_title_matching_rejects_partial_title_collisions():

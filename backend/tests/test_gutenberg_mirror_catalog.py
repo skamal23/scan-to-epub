@@ -168,7 +168,7 @@ async def test_dynamic_gutenberg_source_resolves_and_caches_the_official_opds_re
     assert len(first) == 1
     entry = first[0]
     assert entry.entry_id == "project_gutenberg:35"
-    assert entry.rights_evidence == "source_authorized_distribution"
+    assert entry.rights_evidence == "us_public_domain"
     assert entry.download_policy.allow_redirects is True
     assert entry.download_policy.max_redirects == 1
     assert client.search_calls == 1
@@ -181,6 +181,18 @@ async def test_dynamic_gutenberg_source_requires_the_confirmed_author():
     source = ProjectGutenbergOpenEditionSource(client=client)
 
     assert await source.find_all("The Time Machine", ["Ralph Ellison"], None) == ()
+
+
+@pytest.mark.anyio
+async def test_dynamic_gutenberg_rejects_a_copyrighted_feed_record():
+    class CopyrightedClient(StubGutenbergClient):
+        async def get_book(self, detail_url: str, ebook_id: int):
+            book = await super().get_book(detail_url, ebook_id)
+            return replace(book, rights_statement="Copyrighted. Read-only permission granted.")
+
+    source = ProjectGutenbergOpenEditionSource(CopyrightedClient())
+
+    assert await source.find_all("The Time Machine", ["H. G. Wells"], None) == ()
 
 
 @pytest.mark.anyio

@@ -106,6 +106,15 @@ class FailingDynamicCatalog:
         raise SourceUnavailable("dynamic discovery is unavailable")
 
 
+class ExplodingDynamicCatalog:
+    def __init__(self):
+        self.calls = 0
+
+    async def find_all(self, title, authors, physical_isbn13):
+        self.calls += 1
+        raise AssertionError("a later source must not be queried after success")
+
+
 def request(title="Pride and Prejudice", authors=None):
     return EditionResolveRequest(
         candidate_id="physical-candidate",
@@ -878,3 +887,129 @@ async def test_live_dynamic_entry_refreshes_the_matching_static_fallback():
     assert source.requests == [("Pride and Prejudice", ["Jane Austen"], "9780141439518")]
     assert acquirer.entries == [live]
     assert result.source.organization == "Live Standard Ebooks"
+
+
+@pytest.mark.anyio
+async def test_dynamic_sources_stop_after_the_first_verified_epub():
+    payload = epub_bytes()
+    entry = with_payload_hash(STANDARD_EBOOKS_CATALOG.entries[0], payload)
+    first = DynamicCatalog((entry,))
+    later = ExplodingDynamicCatalog()
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        dynamic_sources=(first, later),
+        acquirer=StubAcquirer(payload),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert result.status == "ready"
+    assert later.calls == 0
+
+
+@pytest.mark.anyio
+async def test_dynamic_sources_advance_only_after_no_match():
+    payload = epub_bytes()
+    entry = with_payload_hash(STANDARD_EBOOKS_CATALOG.entries[0], payload)
+    first = DynamicCatalog(())
+    second = DynamicCatalog((entry,))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        dynamic_sources=(first, second),
+        acquirer=StubAcquirer(payload),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert result.status == "ready"
+    assert len(first.requests) == 1
+    assert len(second.requests) == 1
+
+
+@pytest.mark.anyio
+async def test_dynamic_sources_advance_after_a_matching_epub_fails_validation():
+    payload = epub_bytes()
+    first_entry = replace(
+        STANDARD_EBOOKS_CATALOG.entries[0],
+        source_organization="First live source",
+        digital_identifier="https://example.invalid/first",
+    )
+    second_entry = replace(
+        first_entry,
+        source_key="second",
+        source_organization="Second live source",
+        digital_identifier="https://example.invalid/second",
+    )
+    first = DynamicCatalog((first_entry,))
+    second = DynamicCatalog((second_entry,))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        dynamic_sources=(first, second),
+        acquirer=StubAcquirer(payload),
+        validator=SequencedValidator(
+            [
+                EpubcheckResult(version="5.3.0", valid=False, warnings=[]),
+                EpubcheckResult(version="5.3.0", valid=True, warnings=[]),
+            ]
+        ),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert result.status == "ready"
+    assert result.source.organization == "Second live source"
+    assert result.provenance.source_attempts == ["First live source", "Second live source"]
+
+
+@pytest.mark.anyio
+async def test_dynamic_sources_advance_after_discovery_outage():
+    payload = epub_bytes()
+    entry = with_payload_hash(STANDARD_EBOOKS_CATALOG.entries[0], payload)
+    first = FailingDynamicCatalog()
+    second = DynamicCatalog((entry,))
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        dynamic_sources=(first, second),
+        acquirer=StubAcquirer(payload),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert result.status == "ready"
+    assert len(first.requests) == 1
+    assert len(second.requests) == 1
+
+
+@pytest.mark.anyio
+async def test_dynamic_sources_advance_after_acquisition_outage():
+    payload = epub_bytes()
+    first_entry = replace(
+        STANDARD_EBOOKS_CATALOG.entries[0],
+        source_organization="Standard Ebooks",
+    )
+    second_entry = replace(
+        first_entry,
+        source_key="oapen",
+        source_organization="OAPEN",
+        digital_identifier="https://example.invalid/oapen-fallback",
+    )
+    service = EditionResolutionService(
+        catalog=ApprovedEpubCatalog(entries=()),
+        dynamic_sources=(DynamicCatalog((first_entry,)), DynamicCatalog((second_entry,))),
+        acquirer=FallbackAcquirer(payload),
+        validator=StubValidator(EpubcheckResult(version="5.3.0", valid=True, warnings=[])),
+        artifact_store=EphemeralEpubStore(),
+    )
+
+    result = await service.resolve(request())
+
+    assert result.status == "ready"
+    assert result.source.organization == "OAPEN"
+    assert result.provenance.source_attempts == ["Standard Ebooks", "OAPEN"]

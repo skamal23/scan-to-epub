@@ -237,6 +237,8 @@ class ProjectGutenbergOpenEditionSource:
                 authors, book.authors
             ):
                 continue
+            if not _is_us_public_domain(book.rights_statement):
+                continue
             entries.append(_dynamic_gutenberg_entry(listing.ebook_id, book))
             if len(entries) == 3:
                 break
@@ -408,7 +410,7 @@ def _dynamic_gutenberg_entry(ebook_id: int, book: GutenbergOpenBook) -> Approved
         canonical_url=canonical_url,
         acquisition_url=book.acquisition_url,
         cover_url=book.cover_url,
-        rights_evidence="source_authorized_distribution",
+        rights_evidence="us_public_domain",
         license_name="Project Gutenberg License",
         license_url="https://www.gutenberg.org/policy/license.html",
         rights_statement=(
@@ -422,4 +424,16 @@ def _dynamic_gutenberg_entry(ebook_id: int, book: GutenbergOpenBook) -> Approved
             allow_redirects=True,
             max_redirects=1,
         ),
+    )
+
+
+def _is_us_public_domain(rights_statement: str) -> bool:
+    normalized = " ".join(rights_statement.casefold().split())
+    return (
+        "public domain in the usa" in normalized
+        or "public domain in the united states" in normalized
+        or (
+            "not protected by copyright law" in normalized
+            and ("united states" in normalized or "usa" in normalized)
+        )
     )

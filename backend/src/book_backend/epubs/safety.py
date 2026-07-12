@@ -47,7 +47,7 @@ def inspect_epub(
             if entry.compress_size and entry.file_size / entry.compress_size > 200:
                 raise InvalidEpub("EPUB contains a suspicious compression ratio")
         if "META-INF/encryption.xml" in archive.namelist():
-            raise InvalidEpub("EPUB is encrypted or DRM-protected")
+            _check_encryption(archive)
         try:
             container_xml = archive.read("META-INF/container.xml")
         except KeyError as error:
@@ -83,6 +83,39 @@ def _check_entry(entry: zipfile.ZipInfo) -> None:
         raise InvalidEpub("EPUB contains a symbolic link")
     if entry.flag_bits & 0x1:
         raise InvalidEpub("EPUB contains an encrypted entry")
+
+
+def _check_encryption(archive: zipfile.ZipFile) -> None:
+    try:
+        root = ElementTree.fromstring(archive.read("META-INF/encryption.xml"))
+    except ElementTree.ParseError as error:
+        raise InvalidEpub("EPUB is encrypted or DRM-protected") from error
+    encrypted_data = [element for element in root.iter() if element.tag.endswith("EncryptedData")]
+    if not encrypted_data:
+        raise InvalidEpub("EPUB is encrypted or DRM-protected")
+    names = set(archive.namelist())
+    for encrypted in encrypted_data:
+        methods = [
+            element for element in encrypted.iter() if element.tag.endswith("EncryptionMethod")
+        ]
+        references = [
+            element for element in encrypted.iter() if element.tag.endswith("CipherReference")
+        ]
+        if len(methods) != 1 or len(references) != 1:
+            raise InvalidEpub("EPUB is encrypted or DRM-protected")
+        if methods[0].attrib.get("Algorithm") != "http://www.idpf.org/2008/embedding":
+            raise InvalidEpub("EPUB is encrypted or DRM-protected")
+        uri = references[0].attrib.get("URI", "")
+        path = PurePosixPath(uri)
+        if (
+            not uri
+            or "\\" in uri
+            or path.is_absolute()
+            or ".." in path.parts
+            or path.suffix.casefold() not in {".otf", ".ttf", ".woff", ".woff2"}
+            or uri not in names
+        ):
+            raise InvalidEpub("EPUB is encrypted or DRM-protected")
 
 
 def _check_active_content(archive: zipfile.ZipFile, entries: list[zipfile.ZipInfo]) -> None:
