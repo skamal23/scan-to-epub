@@ -27,10 +27,10 @@
 **Interfaces:**
 - Produces `title_match_score(query: str, candidate: str) -> float`, `authors_match(query: list[str], candidate: tuple[str, ...]) -> bool`, and a monotonic TTL cache used by both source adapters.
 
-- [ ] Write failing tests for punctuation, subtitles, initials, diacritics, and Gutenberg author order.
-- [ ] Run the focused test and confirm it fails because the module is absent.
-- [ ] Implement normalization, scoring, and caching.
-- [ ] Run the focused tests and confirm they pass.
+- [x] Write failing tests for punctuation, subtitles, initials, diacritics, and Gutenberg author order.
+- [x] Run the focused test and confirm it fails because the module is absent.
+- [x] Implement normalization, scoring, and caching.
+- [x] Run the focused tests and confirm they pass.
 
 ### Task 2: Dynamic Standard Ebooks adapter
 
@@ -41,10 +41,10 @@
 **Interfaces:**
 - Produces `HttpStandardEbooksClient` and `StandardEbooksOpenEditionSource.find_all(...)` implementing `DynamicReviewedCatalog`.
 
-- [ ] Write failing parser/source tests using XHTML search and book-page fixtures.
-- [ ] Confirm tests fail for missing dynamic classes.
-- [ ] Implement source search, confident local matching, canonical detail parsing, compatible EPUB selection, cover extraction, and TTL caching.
-- [ ] Confirm the focused tests pass.
+- [x] Write failing parser/source tests using XHTML search and book-page fixtures.
+- [x] Confirm tests fail for missing dynamic classes.
+- [x] Implement source search, confident local matching, canonical detail parsing, compatible EPUB selection, cover extraction, and TTL caching.
+- [x] Confirm the focused tests pass.
 
 ### Task 3: Dynamic Project Gutenberg adapter
 
@@ -55,10 +55,10 @@
 **Interfaces:**
 - Produces `HttpProjectGutenbergOpdsClient` and `ProjectGutenbergOpenEditionSource.find_all(...)` implementing `DynamicReviewedCatalog`.
 
-- [ ] Write failing OPDS search/detail tests covering EPUB3, image, and no-image preference plus rights metadata and redirects.
-- [ ] Confirm tests fail for missing dynamic classes.
-- [ ] Implement OPDS parsing, ranking, per-book acquisition lookup, and TTL caching.
-- [ ] Confirm the focused tests pass.
+- [x] Write failing OPDS search/detail tests covering EPUB3, image, and no-image preference plus rights metadata and redirects.
+- [x] Confirm tests fail for missing dynamic classes.
+- [x] Implement OPDS parsing, ranking, per-book acquisition lookup, and TTL caching.
+- [x] Confirm the focused tests pass.
 
 ### Task 4: Live app wiring and fallback behavior
 
@@ -71,10 +71,10 @@
 **Interfaces:**
 - Live `create_app` supplies Standard Ebooks and Project Gutenberg sources unconditionally, with optional Google Books after them.
 
-- [ ] Write failing tests for default live-source wiring and unchanged Project Gutenberg delivery rights.
-- [ ] Confirm focused failures.
-- [ ] Wire adapters and add an explicit source-authorized unchanged-distribution rights class.
-- [ ] Confirm focused tests pass.
+- [x] Write failing tests for default live-source wiring and unchanged Project Gutenberg delivery rights.
+- [x] Confirm focused failures.
+- [x] Wire adapters and add an explicit source-authorized unchanged-distribution rights class.
+- [x] Confirm focused tests pass.
 
 ### Task 5: Live retrieval and complete verification
 
@@ -85,10 +85,9 @@
 **Interfaces:**
 - Smoke script resolves multiple titles beyond the original curated set from both sources, downloads the returned EPUBs, checks source identity, archive safety, and EPUBCheck.
 
-- [ ] Add deterministic tests for any script helpers before implementation.
-- [ ] Run live discovery and download checks for varied titles from each source.
-- [ ] Run the complete backend test/lint/format gate.
-- [ ] Run the mobile test/typecheck/peer gate.
-- [ ] Update README source behavior and phone-live instructions.
-- [ ] Audit every goal requirement against fresh command output.
-
+- [x] Add deterministic tests for source parsing, matching, caching, and runtime wiring.
+- [x] Run live discovery and download checks for varied titles from each source.
+- [x] Run the complete backend test/lint/format gate.
+- [x] Run the mobile test/typecheck/peer gate.
+- [x] Update README source behavior and phone-live instructions.
+- [x] Audit every goal requirement against fresh command output.
