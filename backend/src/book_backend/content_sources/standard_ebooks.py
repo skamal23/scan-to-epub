@@ -144,13 +144,15 @@ class StandardEbooksOpenEditionSource:
 
         entries: list[StandardEbookEntry] = []
         last_error: SourceUnavailable | None = None
-        for _, listing in matches[:3]:
+        for _, listing in matches:
             try:
                 book = await self.client.get_book(listing.canonical_url)
             except SourceUnavailable as error:
                 last_error = error
                 continue
             entries.append(_dynamic_entry(listing, book))
+            if len(entries) == 3:
+                break
         if not entries and last_error is not None:
             raise last_error
 

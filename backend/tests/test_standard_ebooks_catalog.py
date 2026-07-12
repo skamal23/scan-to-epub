@@ -8,6 +8,7 @@ from book_backend.content_sources.standard_ebooks import (
     parse_standard_ebooks_book,
     parse_standard_ebooks_search,
 )
+from book_backend.editions.errors import SourceUnavailable
 
 
 def test_curated_fallback_catalog_has_five_pinned_unique_entries():
@@ -150,3 +151,36 @@ async def test_dynamic_source_requires_the_confirmed_author():
 
     assert await source.find_all("The Time Machine", ["Ralph Ellison"], None) == ()
     assert client.book_calls == 0
+
+
+@pytest.mark.anyio
+async def test_dynamic_source_checks_every_matching_catalog_result_until_one_is_available():
+    class LaterAvailableClient:
+        async def search(self, _query: str):
+            return tuple(
+                StandardEbooksListing(
+                    title="Shared Title",
+                    authors=("Example Author",),
+                    canonical_url=f"https://standardebooks.org/ebooks/example/shared-title-{index}",
+                )
+                for index in range(4)
+            )
+
+        async def get_book(self, canonical_url: str):
+            if not canonical_url.endswith("-3"):
+                raise SourceUnavailable("edition unavailable")
+            return StandardEbooksBook(
+                language="en",
+                acquisition_url=(
+                    f"{canonical_url}/downloads/example_shared-title-3.epub?source=download"
+                ),
+                cover_url=None,
+                reviewed_at="2026-07-11",
+            )
+
+    source = StandardEbooksOpenEditionSource(LaterAvailableClient())
+
+    entries = await source.find_all("Shared Title", ["Example Author"], None)
+
+    assert len(entries) == 1
+    assert entries[0].canonical_url.endswith("-3")

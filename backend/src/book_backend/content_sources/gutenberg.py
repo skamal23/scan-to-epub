@@ -227,7 +227,7 @@ class ProjectGutenbergOpenEditionSource:
 
         entries: list[ApprovedEpubEntry] = []
         last_error: SourceUnavailable | None = None
-        for _, listing in matches[:5]:
+        for _, listing in matches:
             try:
                 book = await self.client.get_book(listing.detail_url, listing.ebook_id)
             except SourceUnavailable as error:
@@ -238,6 +238,8 @@ class ProjectGutenbergOpenEditionSource:
             ):
                 continue
             entries.append(_dynamic_gutenberg_entry(listing.ebook_id, book))
+            if len(entries) == 3:
+                break
         if not entries and last_error is not None:
             raise last_error
 

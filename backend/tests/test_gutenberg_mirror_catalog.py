@@ -11,6 +11,7 @@ from book_backend.content_sources.gutenberg import (
     parse_gutenberg_book_feed,
     parse_gutenberg_search_feed,
 )
+from book_backend.editions.errors import SourceUnavailable
 
 
 def _manifest_entry() -> GutenbergMirrorEntry:
@@ -180,3 +181,38 @@ async def test_dynamic_gutenberg_source_requires_the_confirmed_author():
     source = ProjectGutenbergOpenEditionSource(client=client)
 
     assert await source.find_all("The Time Machine", ["Ralph Ellison"], None) == ()
+
+
+@pytest.mark.anyio
+async def test_dynamic_gutenberg_checks_past_unavailable_duplicate_editions():
+    class LaterAvailableClient:
+        async def search(self, _query: str):
+            return tuple(
+                GutenbergOpdsListing(
+                    ebook_id=ebook_id,
+                    title="Shared Title",
+                    authors=("Example Author",),
+                    detail_url=f"https://www.gutenberg.org/ebooks/{ebook_id}.opds",
+                )
+                for ebook_id in range(1, 7)
+            )
+
+        async def get_book(self, _detail_url: str, ebook_id: int):
+            if ebook_id < 6:
+                raise SourceUnavailable("edition unavailable")
+            return GutenbergOpenBook(
+                title="Shared Title",
+                authors=("Example Author",),
+                language="en",
+                acquisition_url="https://www.gutenberg.org/ebooks/6.epub3.images",
+                cover_url=None,
+                rights_statement="Public domain in the USA.",
+                reviewed_at="2026-07-11",
+            )
+
+    source = ProjectGutenbergOpenEditionSource(LaterAvailableClient())
+
+    entries = await source.find_all("Shared Title", ["Example Author"], None)
+
+    assert len(entries) == 1
+    assert entries[0].entry_id == "project_gutenberg:6"
