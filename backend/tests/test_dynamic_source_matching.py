@@ -46,3 +46,19 @@ def test_ttl_cache_returns_copies_until_expiry():
 
     now[0] = 15.0
     assert cache.get("key") is None
+
+
+def test_unicode_titles_remain_distinct_and_cache_is_bounded():
+    assert title_match_score("紅樓夢", "紅樓夢") == 1
+    assert title_match_score("紅樓夢", "西游記") < 0.5
+    cache = TtlCache(ttl_seconds=60, copy=lambda value: value)
+    for index in range(300):
+        cache.set(str(index), index)
+    assert cache.get("0") is None
+    assert cache.get("299") == 299
+
+
+def test_subtitles_do_not_turn_study_guides_into_original_books():
+    assert title_match_score("Hamlet", "Hamlet: Study Guide") < 0.8
+    assert title_match_score("Hamlet", "Hamlet: Abridged") < 0.8
+    assert title_match_score("Hamlet: Study Guide", "Hamlet: Study Guide") == 1

@@ -1,11 +1,11 @@
 {
   "expo": {
-    "name": "Book to EPUB",
+    "name": "Book",
     "slug": "book-to-epub",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "plugins": [
       [
@@ -15,15 +15,18 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      "expo-sqlite",
+      "expo-font"
     ],
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F4F1EA"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.skamal.book"
     },
     "android": {
       "adaptiveIcon": {
@@ -35,6 +38,7 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "scheme": "book"
   }
 }

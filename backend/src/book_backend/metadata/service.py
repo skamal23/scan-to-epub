@@ -1,10 +1,11 @@
 import asyncio
 import hashlib
 import logging
-import re
 import time
 from collections import defaultdict
 from difflib import SequenceMatcher
+
+from book_backend.content_sources.matching import normalized_words
 
 from .models import (
     BookRecord,
@@ -65,6 +66,9 @@ class MetadataSearchService:
             provider_failures=failures,
         )
         if not failures and self.cache_ttl_seconds > 0:
+            self._cache = {key: item for key, item in self._cache.items() if item[0] > now}
+            if len(self._cache) >= 256:
+                self._cache.pop(next(iter(self._cache)))
             self._cache[query] = (now + self.cache_ttl_seconds, result.model_copy(deep=True))
         return result
 
@@ -169,7 +173,7 @@ def _deduplication_key(query: MetadataQuery, record: BookRecord) -> str:
 
 
 def _normalized(value: str) -> str:
-    return " ".join(re.findall(r"[a-z0-9]+", value.casefold()))
+    return " ".join(normalized_words(value))
 
 
 def _similarity(left: str, right: str) -> float:

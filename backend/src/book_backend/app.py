@@ -1,9 +1,13 @@
 import asyncio
 import logging
+import shutil
+import subprocess
+from contextlib import asynccontextmanager
 from typing import Protocol
 from uuid import uuid4
 
 from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 
 from .config import Settings
 from .content_sources.catalog import (
@@ -35,7 +39,7 @@ from .editions.errors import SourceUnavailable, ValidationFailed
 from .editions.fixtures import FixtureEditionResolutionService
 from .editions.models import EditionResolutionResult, EditionResolveRequest
 from .editions.service import EditionResolutionService
-from .epubs.artifacts import EphemeralEpubStore
+from .epubs.artifacts import EphemeralEpubStore, SqliteEpubStore
 from .epubs.validator import EpubcheckValidator
 from .metadata.models import MetadataSearchRequest, MetadataSearchResult
 from .metadata.providers import (
@@ -101,7 +105,35 @@ def create_app(
     epub_store: EphemeralEpubStore | None = None,
 ) -> FastAPI:
     app = FastAPI(title="Book Backend", version="0.1.0")
-    epub_store = epub_store or EphemeralEpubStore(ttl_seconds=settings.epub_artifact_ttl_seconds)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=list(settings.cors_origins),
+        allow_methods=["GET", "POST"],
+        allow_headers=["Content-Type", "Authorization"],
+        expose_headers=["X-Content-SHA256", "Content-Disposition"],
+    )
+    epub_store = epub_store or (
+        SqliteEpubStore(settings.artifact_database, settings.epub_artifact_ttl_seconds)
+        if settings.artifact_database
+        else EphemeralEpubStore(ttl_seconds=settings.epub_artifact_ttl_seconds)
+    )
+    cover_slots, edition_slots = asyncio.Semaphore(2), asyncio.Semaphore(4)
+
+    @asynccontextmanager
+    async def admitted(slots):
+        try:
+            await asyncio.wait_for(slots.acquire(), timeout=0.1)
+        except TimeoutError as error:
+            raise HTTPException(
+                status_code=503,
+                detail="The service is busy. Try again shortly.",
+                headers={"Retry-After": "5"},
+            ) from error
+        try:
+            yield
+        finally:
+            slots.release()
+
     if metadata_service is None:
         providers = (
             [FixtureMetadataProvider(), FixtureFailureProvider()]
@@ -175,6 +207,30 @@ def create_app(
             "version": "0.1.0",
         }
 
+    @app.get("/ready")
+    async def ready():
+        if settings.fixture_mode:
+            return {"status": "ready", "fixtureMode": True}
+
+        def dependencies_ready():
+            for command in ("tesseract", "epubcheck"):
+                if not shutil.which(command):
+                    return False
+                try:
+                    if subprocess.run(
+                        [command, "--version"], capture_output=True, timeout=10
+                    ).returncode:
+                        return False
+                except (OSError, subprocess.TimeoutExpired):
+                    return False
+            return True
+
+        if not await asyncio.to_thread(dependencies_ready):
+            raise HTTPException(
+                status_code=503, detail="Recognition or EPUB validation is unavailable"
+            )
+        return {"status": "ready", "fixtureMode": False}
+
     @app.post("/metadata/search", response_model=MetadataSearchResult)
     async def search_metadata(request: MetadataSearchRequest) -> MetadataSearchResult:
         return await metadata_service.search(request.to_query())
@@ -196,10 +252,11 @@ def create_app(
         if not image_bytes:
             raise HTTPException(status_code=422, detail="The cover image could not be read")
         try:
-            return await asyncio.wait_for(
-                cover_recognizer.recognize(bytes(image_bytes)),
-                timeout=settings.cover_timeout_seconds,
-            )
+            async with admitted(cover_slots):
+                return await asyncio.wait_for(
+                    cover_recognizer.recognize(bytes(image_bytes)),
+                    timeout=settings.cover_timeout_seconds,
+                )
         except TimeoutError as error:
             raise HTTPException(status_code=504, detail="Cover recognition timed out") from error
         except ValueError as error:
@@ -218,7 +275,12 @@ def create_app(
     @app.post("/editions/resolve", response_model=EditionResolutionResult)
     async def resolve_edition(request: EditionResolveRequest) -> EditionResolutionResult:
         try:
-            return await edition_service.resolve(request)
+            async with admitted(edition_slots):
+                return await asyncio.wait_for(
+                    edition_service.resolve(request), settings.resolve_timeout_seconds
+                )
+        except TimeoutError as error:
+            raise HTTPException(status_code=504, detail="Open-edition search timed out") from error
         except SourceUnavailable as error:
             raise HTTPException(
                 status_code=503,

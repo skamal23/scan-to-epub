@@ -1,15 +1,22 @@
 services:
   - type: web
-    name: book-to-epub-backend-dev
-    runtime: python
+    name: book-reader-backend
+    runtime: docker
     rootDir: backend
-    buildCommand: pip install .
-    startCommand: uvicorn book_backend.app:app --no-access-log --host 0.0.0.0 --port $PORT
-    healthCheckPath: /health
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /ready
+    disk:
+      name: verified-deliveries
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: BOOK_ENVIRONMENT
-        value: development
+        value: production
       - key: BOOK_FIXTURE_MODE
-        value: "true"
-      - key: PYTHON_VERSION
-        value: 3.12.13
+        value: "false"
+      - key: BOOK_ARTIFACT_DATABASE
+        value: /data/deliveries.sqlite
+      - key: BOOK_CONTACT_EMAIL
+        sync: false
+      - key: BOOK_CORS_ORIGINS
+        sync: false

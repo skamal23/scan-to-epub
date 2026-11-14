@@ -1,0 +1,1 @@
+These phase-numbered flows are historical scripts for the superseded Apple Books export demo. They are not current acceptance tests. Use `mobile/e2e/reading.spec.cjs` for the library/reader browser flow and the physical-device checklist in the root README for Expo Go acceptance.

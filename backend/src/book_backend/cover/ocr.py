@@ -124,8 +124,9 @@ class TesseractCoverOcr:
         self.timeout_seconds = timeout_seconds
 
     async def read(self, image_bytes: bytes) -> list[OcrLine]:
-        cover = CoverImage.decode(image_bytes)
-        input_bytes = cover.to_tesseract_png()
+        input_bytes = await asyncio.to_thread(
+            lambda: CoverImage.decode(image_bytes).to_tesseract_png()
+        )
         try:
             result = await asyncio.to_thread(
                 self.runner,

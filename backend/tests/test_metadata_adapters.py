@@ -84,3 +84,24 @@ async def test_request_gate_spaces_provider_calls() -> None:
     await gate.wait()
 
     assert sleeps == [1.0]
+
+
+def test_isbn_selects_its_edition_instead_of_first_work_edition():
+    doc = {
+        "title": "Pride and Prejudice",
+        "isbn": ["9780141439518"],
+        "editions": {
+            "docs": [
+                {"key": "/books/OTHER", "isbn": ["9780141439983"], "publisher": ["Other"]},
+                {"key": "/books/MATCH", "isbn": ["9780141439518"], "publisher": ["Correct"]},
+            ]
+        },
+    }
+    record = normalize_open_library_doc(doc, "9780141439518")
+    assert record.provider_edition_id == "MATCH"
+    assert record.publisher == "Correct"
+    assert record.isbn13 == "9780141439518"
+    doc["editions"]["docs"].pop()
+    unknown = normalize_open_library_doc(doc, "9780141439518")
+    assert unknown.provider_edition_id is None
+    assert unknown.publisher is None

@@ -7,6 +7,6 @@ export function createExpoCoverClient(baseUrl: string) {
   return createCoverClient({
     baseUrl,
     createUploadTask: FileSystem.createUploadTask as unknown as CreateUploadTask,
-    timeoutMs: 18_000,
+    timeoutMs: 40_000,
   });
 }

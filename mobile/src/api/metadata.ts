@@ -65,6 +65,7 @@ export function createMetadataClient(options: {
   timeoutMs: number;
 }): MetadataClient {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
+  const fetcher = options.fetcher;
   return {
     async search(query, externalSignal) {
       const controller = new AbortController();
@@ -82,7 +83,7 @@ export function createMetadataClient(options: {
       try {
         let response: FetchResponse;
         try {
-          response = await options.fetcher(`${baseUrl}/metadata/search`, {
+          response = await fetcher(`${baseUrl}/metadata/search`, {
             method: 'POST',
             headers: {
               Accept: 'application/json',

@@ -91,10 +91,21 @@ def normalize_google_volume(item: Mapping[str, Any]) -> BookRecord:
     )
 
 
-def normalize_open_library_doc(doc: Mapping[str, Any]) -> BookRecord:
+def normalize_open_library_doc(
+    doc: Mapping[str, Any], observed_isbn: str | None = None
+) -> BookRecord:
     editions = doc.get("editions") if isinstance(doc.get("editions"), Mapping) else {}
     edition_docs = editions.get("docs") if isinstance(editions.get("docs"), list) else []
-    edition = edition_docs[0] if edition_docs and isinstance(edition_docs[0], Mapping) else {}
+    edition = next(
+        (
+            item
+            for item in edition_docs
+            if isinstance(item, Mapping) and observed_isbn and observed_isbn in item.get("isbn", [])
+        ),
+        edition_docs[0]
+        if not observed_isbn and edition_docs and isinstance(edition_docs[0], Mapping)
+        else {},
+    )
     publishers = edition.get("publisher") if isinstance(edition.get("publisher"), list) else []
     publish_dates = (
         edition.get("publish_date") if isinstance(edition.get("publish_date"), list) else []
@@ -105,6 +116,8 @@ def normalize_open_library_doc(doc: Mapping[str, Any]) -> BookRecord:
         else doc.get("language", [])
     )
     isbns = edition.get("isbn") if isinstance(edition.get("isbn"), list) else doc.get("isbn", [])
+    if observed_isbn and observed_isbn in isbns:
+        isbns = [observed_isbn, *[value for value in isbns if value != observed_isbn]]
     cover_id = (
         edition.get("cover_i") if isinstance(edition.get("cover_i"), int) else doc.get("cover_i")
     )
@@ -206,7 +219,9 @@ class OpenLibraryProvider:
             response.raise_for_status()
         payload = response.json()
         docs = payload.get("docs", []) if isinstance(payload, Mapping) else []
-        return [normalize_open_library_doc(doc) for doc in docs if isinstance(doc, Mapping)]
+        return [
+            normalize_open_library_doc(doc, query.isbn) for doc in docs if isinstance(doc, Mapping)
+        ]
 
 
 class FixtureMetadataProvider:

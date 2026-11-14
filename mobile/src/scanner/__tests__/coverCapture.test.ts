@@ -60,3 +60,8 @@ test('cleanup attempts every unique local file even when one deletion fails', as
   expect(remove).toHaveBeenNthCalledWith(1, 'file:///original.jpg', { idempotent: true });
   expect(remove).toHaveBeenNthCalledWith(2, 'file:///prepared.jpg', { idempotent: true });
 });
+
+test('maps the visible guide through the camera preview cover scaling', () => {
+  const { previewCoverCrop } = require('../coverCapture');
+  expect(previewCoverCrop({ width: 1200, height: 1600 }, { width: 390, height: 844, guide: { x: 70, y: 220, width: 250, height: 375 } })).toEqual({ originX: 363, originY: 417, width: 474, height: 711 });
+});

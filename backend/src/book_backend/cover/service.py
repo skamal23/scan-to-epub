@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from difflib import SequenceMatcher
 from typing import Protocol
 
+from book_backend.content_sources.matching import title_match_score
 from book_backend.metadata.models import MetadataCandidate, MetadataQuery
 from book_backend.metadata.service import MetadataSearchService
 
@@ -56,8 +57,6 @@ class CoverRecognitionService:
             failures.update(result.provider_failures)
             for candidate in result.candidates:
                 candidates.setdefault(candidate.candidate_id, candidate)
-            if result.candidates:
-                break
         if not candidates:
             return CoverRecognitionResult(
                 status="no_match",
@@ -75,7 +74,9 @@ class CoverRecognitionService:
         )
         ranked: list[tuple[float, float, float | None, MetadataCandidate]] = []
         for candidate, visual_score in zip(candidate_items, visual_scores, strict=True):
-            title_score = _similarity(primary.title or "", candidate.work.title)
+            title_score = max(
+                title_match_score(query.title or "", candidate.work.title) for query in queries
+            )
             author_score = _author_similarity(primary.author, candidate.work.authors)
             text_score = (
                 title_score if not primary.author else 0.78 * title_score + 0.22 * author_score
@@ -266,7 +267,7 @@ def _similarity(left: str, right: str) -> float:
     left_words = set(normalized_left.split())
     right_words = set(normalized_right.split())
     token_coverage = (
-        len(left_words & right_words) / min(len(left_words), len(right_words))
+        len(left_words & right_words) / len(left_words | right_words)
         if left_words and right_words
         else 0
     )

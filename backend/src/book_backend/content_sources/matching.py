@@ -6,9 +6,11 @@ from difflib import SequenceMatcher
 
 
 def normalized_words(value: str) -> tuple[str, ...]:
-    decomposed = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
+    decomposed = "".join(
+        char for char in unicodedata.normalize("NFKD", value) if not unicodedata.combining(char)
+    )
     normalized = decomposed.casefold().replace("&", " and ")
-    return tuple(re.findall(r"[a-z0-9]+", normalized))
+    return tuple(re.findall(r"[^\W_]+", normalized))
 
 
 def title_match_score(query: str, candidate: str) -> float:
@@ -18,6 +20,12 @@ def title_match_score(query: str, candidate: str) -> float:
         return 0.0
     if query_words == candidate_words:
         return 1.0
+
+    derivative = r"\b(?:study guide|summary|summaries|workbook|retelling|abridged|adaptation)\b"
+    if re.search(derivative, " ".join(candidate_words)) and not re.search(
+        derivative, " ".join(query_words)
+    ):
+        return 0.4
 
     core_separator = r"\s*(?:[:,;]|--|—|\([^)]*\)\s*$)\s*"
     query_core = normalized_words(re.split(core_separator, query, maxsplit=1)[0])
@@ -96,4 +104,8 @@ class TtlCache[K, V]:
     def set(self, key: K, value: V) -> None:
         if self.ttl_seconds <= 0:
             return
-        self._values[key] = (self.clock() + self.ttl_seconds, self.copy(value))
+        now = self.clock()
+        self._values = {key: item for key, item in self._values.items() if item[0] > now}
+        if len(self._values) >= 256:
+            self._values.pop(next(iter(self._values)))
+        self._values[key] = (now + self.ttl_seconds, self.copy(value))

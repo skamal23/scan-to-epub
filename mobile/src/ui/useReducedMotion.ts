@@ -40,7 +40,9 @@ export function useReducedMotionStatus(): ReducedMotionStatus {
           setKnownStatus(enabled);
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        if (active && !receivedChange) setKnownStatus(true);
+      });
 
     const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', (enabled) => {
       if (!active) return;

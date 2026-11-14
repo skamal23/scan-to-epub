@@ -70,4 +70,5 @@ def test_backend_launch_commands_disable_uvicorn_access_logging():
 
     assert makefile.count("uvicorn book_backend.app:app") == 4
     assert makefile.count("--no-access-log") == 4
-    assert "startCommand: uvicorn book_backend.app:app --no-access-log" in render
+    assert "runtime: docker" in render
+    assert "--no-access-log" in (workspace / "backend/Dockerfile").read_text()

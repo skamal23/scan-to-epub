@@ -1,3 +1,5 @@
+> Historical export-demo plan. Superseded by the in-app library/reader implementation described in [README.md](README.md). Apple Books export and the old scenario launcher are no longer the app flow.
+
 # Physical Book to EPUB — iOS Demo Product Plan
 
 ## 1. Purpose

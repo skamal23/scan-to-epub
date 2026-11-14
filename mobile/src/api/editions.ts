@@ -13,6 +13,7 @@ export type EditionResolveRequest = {
   workSourceIds: Record<string, string>;
   editionSourceIds: Record<string, string>;
   territory: 'US';
+  language?: string | null;
 };
 
 export type PhysicalEditionInfo = {
@@ -103,6 +104,7 @@ export function requestForCandidate(candidate: MetadataCandidate): EditionResolv
     workSourceIds: candidate.work.sourceIds,
     editionSourceIds: candidate.edition.sourceIds,
     territory: 'US',
+    language: candidate.work.language || 'en',
   };
 }
 
@@ -112,6 +114,7 @@ export function createEditionClient(options: {
   timeoutMs: number;
 }): EditionClient {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
+  const fetcher = options.fetcher;
   return {
     async resolve(request, externalSignal) {
       const controller = new AbortController();
@@ -126,7 +129,7 @@ export function createEditionClient(options: {
       try {
         let response: FetchResponse;
         try {
-          response = await options.fetcher(`${baseUrl}/editions/resolve`, {
+          response = await fetcher(`${baseUrl}/editions/resolve`, {
             method: 'POST',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
             body: JSON.stringify(request),

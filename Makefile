@@ -1,10 +1,10 @@
 PYTHON ?= .venv/bin/python
 PNPM ?= pnpm
 
-.PHONY: backend-install backend-run backend-run-live backend-run-phone backend-run-phone-live backend-test doctor maestro-golden maestro-visual mobile-install mobile-test test
+.PHONY: backend-install backend-run backend-run-live backend-run-phone backend-run-phone-live backend-test doctor mobile-install mobile-test test
 
 backend-install:
-	$(PYTHON) -m pip install -e './backend[dev]'
+	$(PYTHON) -m pip install -c backend/constraints.txt -e './backend[dev]'
 
 backend-run:
 	BOOK_ENVIRONMENT=development BOOK_FIXTURE_MODE=true $(PYTHON) -m uvicorn book_backend.app:app --no-access-log --host 127.0.0.1 --port 8000
@@ -36,22 +36,5 @@ doctor:
 
 test: backend-test mobile-test
 
-maestro-golden:
-	maestro test .maestro/phase0.yaml
-	maestro test .maestro/phase1.yaml
-	maestro test .maestro/phase2.yaml
-	maestro test .maestro/phase3.yaml
-	maestro test .maestro/phase4.yaml
-	maestro test .maestro/phase6.yaml
-	maestro test .maestro/phase8.yaml
-	maestro test .maestro/phase8-refusal.yaml
-	maestro test .maestro/phase9-golden.yaml
-
-maestro-visual:
-	maestro test .maestro/phase10-visual.yaml
-	maestro test .maestro/phase0.yaml
-	maestro test .maestro/phase1.yaml
-	maestro test .maestro/phase3.yaml
-	maestro test .maestro/phase4.yaml
-	maestro test .maestro/phase8.yaml
-	maestro test .maestro/phase8-refusal.yaml
+browser-test:
+	cd mobile && $(PNPM) test:e2e

@@ -1,159 +1,94 @@
-# Book to EPUB
+# Book
 
-An Expo iPhone app and a small FastAPI service for identifying a physical book and delivering a verified legal EPUB. Product rules and implementation gates live in [PLAN.md](./PLAN.md) and [phases.md](./phases.md).
+Scan a cover or ISBN, confirm the title and author, then automatically find an open edition, save it to the library, and open the in-app reader. Built with Expo for iOS / Expo Go, with a browser preview of the same library and reader.
 
-## Runtime
+The UI uses Instrument Sans, white and soft gray surfaces, a floating library bar, a scanning animation, and a lifted book confirmation. After confirmation, the cover stays visible until the first EPUB page is rendered, then a 480 ms fade through white reveals the reader. Reduce Motion skips the fade. The reader provides chapters, bookmarks, full-book search, themes, font size, typeface, line spacing, and saved position.
 
-- Node.js 24
-- pnpm 11.7
-- Python 3.12
-- Tesseract 5 for deterministic front-cover OCR
-- Java 21 and EPUBCheck 5.3 for EPUB validation
-- Xcode with an iOS Simulator runtime
+## Run the browser preview
 
-## First setup
+Requires Node 24, pnpm 11, Python 3.12. Chrome is enough for visual development; Xcode is optional.
 
-```bash
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -e './backend[dev]'
-brew install -y tesseract epubcheck
+```sh
 cd mobile
 pnpm install --frozen-lockfile
+pnpm web
 ```
 
-Copy `mobile/.env.example` to `mobile/.env.local` only when a non-default API address is needed. The iOS Simulator uses `http://127.0.0.1:8000` by default.
+Open **http://localhost:8081/?demo=ready**. Demo mode is enabled only in development on the web. Scanning and discovery are simulated; saving, importing, deduplicating, reading, bookmarks, and reading position use the real implementation and a complete Project Gutenberg EPUB. The screen labels this mode. It cannot select fake services in a release build or Expo Go.
 
-## Development
+The ready demo uses bundled cover art and in-memory book matches (120 ms), so recognition does not wait on a catalog. The 760 ms cover lift and background fade run alongside recognition. Reduce Motion skips the transform. EPUB saving and reading remain real.
 
-Run the backend:
+Other query values: `barcode`, `ambiguous`, `no-match`, `permission`, `offline`, `unavailable`, `download-error`, `long-title`. Remove `?demo=…` for live services. Browser data lives in IndexedDB; clearing site data removes it.
 
-```bash
-make backend-run
+## Run live discovery
+
+```sh
+python3.12 -m venv .venv
+.venv/bin/python -m pip install -c backend/constraints.txt -e './backend[dev]'
+brew install tesseract epubcheck
+make backend-run-live
 ```
 
-In another terminal, run the Expo app:
+`GET /health` checks the process. `GET /ready` also checks OCR and EPUBCheck. Live discovery requires both tools. Optional `GOOGLE_BOOKS_API_KEY` adds Google Books; `BOOK_CONTACT_EMAIL` identifies requests to catalogs.
 
-```bash
-cd mobile
-pnpm ios
+The app uses `http://127.0.0.1:8000` by default. `mobile/.env.local` can override `EXPO_PUBLIC_API_URL`. Hosted mode (`EXPO_PUBLIC_APP_ENV=hosted`) requires HTTPS. The backend allows browser requests only from `BOOK_CORS_ORIGINS` (comma-separated; localhost:8081 by default).
+
+## Expo Go on an iPhone
+
+Install the Expo Go version supporting SDK 58. On the Mac run `make backend-run-phone-live`. Connect both devices to the same Wi-Fi, find the Mac's address with `ipconfig getifaddr en0`, and set:
+
+```dotenv
+EXPO_PUBLIC_APP_ENV=local
+EXPO_PUBLIC_API_URL=http://YOUR_MAC_LAN_IP:8000
 ```
 
-`make backend-run` uses deterministic local book fixtures. To exercise live metadata, set `BOOK_CONTACT_EMAIL` so Open Library can identify the low-volume client, optionally set `GOOGLE_BOOKS_API_KEY`, and run:
+Save that in `mobile/.env.local`, restart `pnpm start`, and scan Expo's QR code. No custom native module is required: epub.js runs in the Expo Go WebView with React Native reader controls. Barcode recognition is local; a cropped cover image is sent to the service and discarded. Scanning has a manual title/author/ISBN fallback.
 
-```bash
-BOOK_CONTACT_EMAIL=you@example.com GOOGLE_BOOKS_API_KEY=optional-key make backend-run-live
-```
+On iOS, EPUB files live in the app's document directory and metadata/preferences in SQLite. Books remain available offline. Imported duplicates retain their bookmarks and position. Removing a book requires confirmation. Files protected by DRM, active/remote content, or exceeding 25 MB are refused with a recovery message.
 
-Live searches use short result caches, respect Open Library's published request rate, and fall back when one catalog fails. EPUB resolution uses a lazy source chain: Standard Ebooks, Project Gutenberg, English Wikisource, Unglue.it, OAPEN, and then optional Google Books. Each source is queried only if every earlier source failed to produce a rights-eligible EPUB that downloads and passes EPUBCheck. The live adapters are not limited to a checked-in title list.
+## Coverage and edition accuracy
 
-Fixture mode is for automation only. Its unchanged-download fixture is explicitly labeled **Deterministic test fixture** and contains no source-book text. The development-only scenario launcher also provides **Generated test EPUB** and **Generated plain-text EPUB**: both run the real deterministic generation, EPUBCheck, delivery-token, and native export path using purpose-built test text. For a real end-to-end EPUB demo, use `make backend-run-live` (or the phone-live command below): it discovers a matching live-source edition at runtime, downloads the source EPUB, computes its SHA-256, inspects the container, runs EPUBCheck, and keeps the verified bytes in memory for a short time. `BOOK_EPUB_ARTIFACT_TTL_SECONDS` controls that window and defaults to 600 seconds.
+Identification searches Open Library and optionally Google Books. Discovery searches Standard Ebooks, Project Gutenberg, English Wikisource, Unglue.it, and OAPEN dynamically; it is not limited to the reviewed fallback books. Sources must establish eligible public-domain or open-license access. The app asks for confirmation before acquisition and distinguishes the physical publication from the available reading edition.
 
-### Expo Go on a physical iPhone
+Coverage is broad, not universal. Most commercially copyrighted books have no freely distributable full EPUB. Those books receive an honest unavailable result and an import option. Current source eligibility is U.S.-based; source language must match the requested language. Cover OCR currently has English language data. Title search accepts Unicode. OCR accuracy still depends on lighting, print, and framing.
 
-Keep the Mac and iPhone on the same trusted Wi-Fi network, then run:
+Existing deterministic EPUB generation from approved structured text / suitable text PDFs remains in the service. Its reviewed live conversion catalogs are empty: it does not invent a book's text or turn a cover into a full book. EPUB delivery requires container validation, EPUBCheck, byte length, and SHA-256 verification.
 
-```bash
-make backend-run-phone
-ipconfig getifaddr en0
-```
+## Checks
 
-Create `mobile/.env.local` from `mobile/.env.example`, set `EXPO_PUBLIC_API_URL` to the printed LAN address (for example, `http://10.0.0.12:8000`), and restart Expo. The backend listens on all local interfaces only in this explicit phone-development command; do not expose it to an untrusted network.
-
-The local demo sends no-store, no-referrer, and content-type hardening headers on every response. A hosted public backend must enforce HTTPS at its deployment boundary; do not treat the local Wi-Fi HTTP workflow as a public deployment configuration.
-
-```bash
-cd mobile
-pnpm start
-```
-
-Scan that Expo QR code on the iPhone while both devices remain on the same network.
-
-The front-cover shutter crops and compresses the photo on the phone, uploads only that bounded crop, and deletes both local temporary files after success, failure, timeout, or cancellation. The backend processes the crop in memory and does not retain it. Barcode scans do not upload a photo.
-
-`make backend-run-phone` uses deterministic demo books. To scan arbitrary ISBNs against live catalogs, use the same `BOOK_CONTACT_EMAIL` and optional `GOOGLE_BOOKS_API_KEY` variables with `make backend-run-phone-live` instead.
-
-For the actual legal-book handoff on a phone, prefer `make backend-run-phone-live`. After a verified result, **Open in Books** and **Save to Files** both open iOS's native share sheet with an EPUB file; the user makes the final Books or Files choice. The app never silently inserts a file into Apple Books. It verifies the downloaded byte length and SHA-256 before handing the file off, and removes its temporary cache copy when the user scans another book.
-
-The app also supports `EXPO_PUBLIC_APP_ENV=hosted` with an HTTPS `EXPO_PUBLIC_API_URL`. The checked-in [render.yaml](./render.yaml) describes a reproducible development deployment for that path. Creating the hosted service is intentionally deferred until a remotely reachable backend is needed.
-
-## Open source behavior
-
-- **Standard Ebooks** is the first live source. The backend searches its public XHTML catalog, confirms title and author locally, reads the canonical book page, and selects the compatible EPUB. Results are cached briefly. The five hash-pinned records remain only as network-failure fallbacks and do not limit coverage.
-- **Project Gutenberg** is queried through its official OPDS interface. The adapter confirms title and author, accepts only records explicitly marked public domain in the U.S., prefers EPUB3 with images, and follows at most one same-host redirect.
-- **English Wikisource** is searched through the MediaWiki API. Complete/exportable works are downloaded through the official WS Export service and delivered only when the export itself passes container inspection and EPUBCheck. Wikisource attribution and CC BY-SA provenance are retained.
-- **Unglue.it** uses its no-key ISBN widget/per-work feeds first and its title OPDS feed as fallback. Only Unglue-hosted EPUBs marked Public Domain, CC0, CC BY, or CC BY-SA are eligible; NC and ND licenses are rejected.
-- **OAPEN** is queried dynamically through its REST API. Only existing EPUB bitstreams with matching CC0, CC BY, or CC BY-SA metadata are eligible. The backend pins the OAPEN-supplied MD5 and checks the OAPEN host, container safety, and EPUBCheck before delivery.
-- **DOAB** is treated as a discovery directory, not a file host. Its reviewed record is retained separately from the final OAPEN file so provenance never implies that DOAB served the EPUB.
-- **Google Books** is considered only when its API response says `US`, `FULL_PUBLIC_DOMAIN`, `publicDomain: true`, `ALL_PAGES`, and supplies a non-ACS EPUB download. Samples, account-bound downloads, partial views, and non-Google download hosts are rejected. Its download may make one explicitly allowlisted Google-host redirect; the resulting file is still inspected and EPUBCheck-validated.
-
-The resolver walks this order sequentially and stops immediately after the first verified EPUB. When an existing EPUB cannot be legally delivered or verified, it tries the next distinct edition and then the next source; reviewed structured and PDF snapshots remain final fallbacks. It never expands to a general web search, shadow library, preview, lending source, or arbitrary file host.
-
-## Structured-source generation behavior
-
-An existing reviewed EPUB is always preferred. If no existing EPUB can be legally delivered and verified for the confirmed work, the backend can use a separately reviewed structured-source snapshot and generate an EPUB only when all of these hold:
-
-- The source snapshot is explicitly modeled in the structured catalog with its source URL, retrieval timestamp, rights evidence, format, and pinned SHA-256.
-- The rights policy permits a generated EPUB in the U.S. for public domain, CC0, and CC BY with reviewed attribution. CC BY-SA remains fail-closed until the generator can attach and verify an explicit compliant derivative license.
-- The source fits the deliberately small supported subset: strict HTML documents/fragments or plain text with explicit `# ` chapter markers. Scripts, remote/embedded images, active elements, malformed markup, unsupported attributes, and ambiguous chapter structure fail closed.
-- The generated archive passes container safety inspection, a normalized source/output text-integrity comparison, and EPUBCheck before a short-lived delivery token is issued.
-
-Generated files include a navigation document, source and license notice, a typographic cover, language and accessibility metadata, and provenance for the source retrieval time, conversion time, source hash, final EPUB hash, converter version, and transformation steps. The iOS result explicitly says **Generated open edition** and never describes it as an unchanged download. A source that cannot be safely converted shows an honest refusal and has no export action.
-
-This first generator intentionally does **not** normalize XML/XHTML declarations or reuse source images. Those capabilities require separate structural and rights rules, so such input is refused rather than silently simplified.
-
-The production structured catalog intentionally starts empty: no external HTML or text source is enabled until its exact rights evidence and content snapshot have been reviewed. The two development fixture routes exist solely to exercise this end-to-end path without presenting fixture text as a real book source.
-
-## Guarded PDF conversion behavior
-
-PDF conversion is a separate, stricter fallback. An existing reviewed EPUB and a reviewed structured source are still preferred. A PDF may proceed only from a reviewed, hash-pinned snapshot after the U.S. rights decision has authorized transformation.
-
-- The current gate accepts only unencrypted, consistently sized, text-based PDFs with one stable body left edge, simple prose-only punctuation, and no images, forms/XFA data, tables (including a single tightly spaced borderless row), mathematical notation, footnote markers, or unclassified footer/marginalia.
-- It removes only repeated top-of-page running headers and numeric page footers, records every removal, and requires every remaining source line to be accounted for exactly once and in reading order.
-- It preserves ordinary line-end hyphens; it removes only an explicit soft hyphen, whose discretionary meaning is unambiguous.
-- Every accepted snapshot must also match its reviewed structural-profile hash. Its deterministic HTML output enters the same EPUB safety, text-integrity, EPUBCheck, delivery-token, Books, and Files path as other generated editions.
-
-Complex layouts and scans fail closed with “We found an authorized PDF, but could not safely convert its layout into an EPUB.” They never get a download action. The production PDF catalog also starts empty until each exact PDF snapshot, source URL, source hash, reviewed analysis profile, license, and retrieval timestamp has been reviewed. The development-only PDF scenario uses a purpose-built fixture and is not a source for a real book.
-
-## Verification
-
-```bash
+```sh
 make test
-make doctor
+cd mobile
+pnpm test:e2e
+E2E_LIVE=1 pnpm test:e2e   # also requires the backend and internet
+pnpm exec expo export --platform ios --output-dir dist-ios
 ```
 
-To repeat live source verification against titles outside the curated fallback, including real downloads, archive inspection, SHA-256, and EPUBCheck:
+Browser tests exercise the full reading journey, visible chapter navigation, search, preferences, bookmarks, refresh/resume, offline reading, removal, import, deduplication, ambiguity, permission denial, cancellation, and failure states. Tests use Chrome by default; set `PLAYWRIGHT_CHANNEL=chromium` after `pnpm exec playwright install chromium` to use bundled Chromium. Screenshots and traces go to `mobile/test-results`.
 
-```bash
-.venv/bin/python backend/scripts/live_catalog_smoke.py
-```
+Before release, verify real iPhone camera framing/autofocus, barcode recognition, haptics, document picker, WebView pagination, VoiceOver, large text, background/foreground, and relaunch in airplane mode. Browser tests do not establish those hardware behaviors.
 
-### Expo Go Simulator golden flow
+## Hosting
 
-With the fixture backend (`make backend-run`) and Metro/Expo Go already open in a booted iOS Simulator, run:
+`backend/Dockerfile` includes OCR, a checksum-pinned EPUBCheck 5.3.0, and constrained Python dependencies. `render.yaml` uses live production mode, `/ready`, and a persistent disk for expiring downloads. Production rejects fixture mode. SQLite deliveries survive process restarts, expire after ten minutes, hash their credentials at rest, and have a 500 MB capacity limit. Resolution and OCR have deadlines and concurrency limits; provider caches are bounded.
 
-```bash
-make maestro-golden
-```
+This configuration targets one service instance. Before horizontal scaling, move delivery storage and provider request budgets to shared infrastructure; deploy behind HTTPS and apply an edge rate limit. Configure the contact email, browser origins, monitoring, and backups for the chosen host. The repository does not contain a deployed endpoint or signing credentials.
 
-This is the repeatable app-owned smoke gate for the deterministic scenarios. It intentionally excludes the older flows that tap into the native iOS share sheet, because that sheet is owned by iOS rather than Expo Go and can leave an automation driver waiting. After the gate, use Computer Use or a manual Simulator check to open the generated-PDF scenario, confirm the native share sheet appears, then dismiss it without choosing a destination. Separately, do a short physical-iPhone Expo Go pass for camera permission, framing, focus, barcode detection, and the final Apple Books/Files choice.
+## Third-party notices
 
-### Expo Go Simulator visual gate
+The bundled reader is epub.js (BSD-2-Clause) and JSZip (MIT/GPL dual license, used under MIT); license files are in `mobile/src/reader/vendor`. `pnpm install` regenerates the browser engine from the locked packages, with no CDN dependency. Instrument Sans is under the SIL Open Font License. The browser demo EPUB is an unchanged Project Gutenberg file with its full license retained; see `mobile/public/demo/README.txt`.
 
-Start the fixture backend in one terminal and Metro in another, then make sure the **Book to EPUB** project is already open in Expo Go on a booted iOS Simulator:
+The original audit is in `docs/production-audit-2026-11-13.md`. `PLAN.md`, `phases.md`, and older design documents describe the superseded export-only demo; this README describes the current app.
 
-```bash
-make backend-run
-cd mobile && pnpm ios
-```
+Standalone builds have `preview` and `production` profiles in `mobile/eas.json`. Set `EXPO_PUBLIC_API_URL` to the deployed HTTPS service in the matching EAS environment before building. Apple signing, App Store privacy disclosures, and device acceptance are release steps, not part of browser verification.
 
-From the repository root, run:
+### Interface references
 
-```bash
-make maestro-visual
-```
+The interface uses native React Native adaptations of these 21st.dev patterns:
 
-This serial gate saves stable screenshots for the camera shell and fallback home, confirmation, ready, long-title, unavailable, Details, and guarded-PDF-refusal states. Each Maestro flow runs in its own process because they share one Simulator. It deliberately never taps into the native iOS share sheet and makes no physical-camera claim. Check camera framing/focus/barcode behavior on a real iPhone in Expo Go, and manually confirm the Apple Books and Files destinations from a ready EPUB after the automated gate.
+- [3D Card Effect](https://21st.dev/@manuarora700/components/3d-card-effect): perspective, layered page edges, and a shared cover position through scan and confirmation.
+- [Floating Dock](https://21st.dev/@manuarora700/components/floating-dock) and [Animated Tabs](https://21st.dev/@manuarora700/components/tabs): a restrained floating navigation bar and moving selection indicators.
+- [Interactive Hover Button](https://21st.dev/@dillionverma/components/interactive-hover-button): subtle pointer/press feedback, translated to touch controls.
+- [Skeleton](https://21st.dev/@shadcn/components/skeleton): placeholders matching the content, with a quiet shimmer.
 
-The development-only scenario launcher is controlled by React Native's `__DEV__` flag and is absent from release builds.
-
-Camera framing and focus cannot be validated in iOS Simulator. The automated suite covers the permission, capture-boundary, processing, cancellation, recognition, ambiguity, recovery, and cleanup paths; a short real-camera check in Expo Go is intentionally manual.
+These are original native implementations of the visual patterns, not imports of their DOM/Tailwind source. No new animation dependencies or web-only UI are needed. Motion respects Reduce Motion, controls retain readable labels and minimum touch areas, and secondary actions have less visual emphasis. References: [Apple design principles](https://developer.apple.com/design/human-interface-guidelines/design-principles/), [motion guidance](https://developer.apple.com/design/human-interface-guidelines/motion), and [2025 Design Awards](https://developer.apple.com/design/awards/2025/) (CapWords, iA Writer, Mela).

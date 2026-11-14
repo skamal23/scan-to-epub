@@ -106,3 +106,77 @@ def safe_epub_filename(title: str, authors: list[str]) -> str:
 def _safe_part(value: str) -> str:
     ascii_value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode()
     return "-".join(re.findall(r"[A-Za-z0-9]+", ascii_value))
+
+
+class SqliteEpubStore(EphemeralEpubStore):
+    """Short-lived deliveries shared across restarts on one persistent volume."""
+
+    def __init__(self, path: str, ttl_seconds: int = 600, max_bytes: int = 500_000_000):
+        import sqlite3
+        from pathlib import Path
+
+        super().__init__(ttl_seconds=ttl_seconds)
+        Path(path).parent.mkdir(parents=True, exist_ok=True)
+        self.path = path
+        self.max_bytes = max_bytes
+        with sqlite3.connect(path) as db:
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS artifacts (token TEXT PRIMARY KEY, "
+                "content BLOB NOT NULL, filename TEXT NOT NULL, sha256 TEXT NOT NULL, "
+                "expires REAL NOT NULL)"
+            )
+
+    async def stage(
+        self, content: bytes, sha256: str, title: str, authors: list[str]
+    ) -> EpubDelivery:
+        import sqlite3
+
+        if hashlib.sha256(content).hexdigest() != sha256:
+            raise ValueError("Only a hash-verified EPUB can be staged")
+        token = secrets.token_urlsafe(32)
+        expires = self.now() + self.ttl
+        filename = safe_epub_filename(title, authors)
+
+        def write():
+            with sqlite3.connect(self.path, timeout=10) as db:
+                db.execute("BEGIN IMMEDIATE")
+                db.execute("DELETE FROM artifacts WHERE expires <= ?", (self.now().timestamp(),))
+                size = db.execute(
+                    "SELECT coalesce(sum(length(content)), 0) FROM artifacts"
+                ).fetchone()[0]
+                if size + len(content) > self.max_bytes:
+                    from ..editions.errors import SourceUnavailable
+
+                    raise SourceUnavailable("Download storage is busy. Try again shortly.")
+                db.execute(
+                    "INSERT INTO artifacts VALUES (?, ?, ?, ?, ?)",
+                    (
+                        hashlib.sha256(token.encode()).hexdigest(),
+                        content,
+                        filename,
+                        sha256,
+                        expires.timestamp(),
+                    ),
+                )
+
+        await asyncio.to_thread(write)
+        return EpubDelivery(self.download_path, token, filename, len(content), sha256, expires)
+
+    async def get(self, token: str) -> StoredEpub | None:
+        import sqlite3
+
+        def read():
+            with sqlite3.connect(self.path, timeout=10) as db:
+                db.execute("DELETE FROM artifacts WHERE expires <= ?", (self.now().timestamp(),))
+                row = db.execute(
+                    "SELECT content, filename, sha256, expires FROM artifacts WHERE token = ?",
+                    (hashlib.sha256(token.encode()).hexdigest(),),
+                ).fetchone()
+            return (
+                StoredEpub(bytearray(row[0]), row[1], row[2], datetime.fromtimestamp(row[3], UTC))
+                if row
+                else None
+            )
+
+        return await asyncio.to_thread(read)

@@ -1,4 +1,6 @@
+import asyncio
 import hashlib
+import time
 from datetime import UTC, datetime
 from typing import Protocol
 
@@ -96,8 +98,25 @@ class EditionResolutionService:
         self.dynamic_sources = dynamic_sources
         self.structured_catalog = structured_catalog
         self.pdf_catalog = pdf_catalog
+        self._results: dict[str, tuple[float, EditionResolutionResult]] = {}
 
     async def resolve(self, request: EditionResolveRequest) -> EditionResolutionResult:
+        key = request.model_dump_json()
+        now = time.monotonic()
+        self._results = {key: value for key, value in self._results.items() if value[0] > now}
+        cached = self._results.get(key)
+        if cached:
+            return cached[1].model_copy(deep=True)
+        result = await self._resolve(request)
+        if result.status == "ready" and result.delivery:
+            remaining = (result.delivery.expires_at - datetime.now(UTC)).total_seconds() - 15
+            if remaining > 0:
+                if len(self._results) >= 64:
+                    self._results.pop(next(iter(self._results)))
+                self._results[key] = (now + min(remaining, 120), result.model_copy(deep=True))
+        return result
+
+    async def _resolve(self, request: EditionResolveRequest) -> EditionResolutionResult:
         source_unavailable: SourceUnavailable | None = None
         validation_failed: ValidationFailed | None = None
         rights_eligible = False
@@ -110,6 +129,11 @@ class EditionResolutionService:
         ) -> EditionResolutionResult | None:
             nonlocal found_entries, rights_eligible, source_unavailable, validation_failed
             for entry in _distinct_by_digital_identifier(list(entries)):
+                if (
+                    request.language
+                    and entry.language.split("-")[0] != request.language.split("-")[0]
+                ):
+                    continue
                 identifier = entry.digital_identifier.rstrip("/").casefold()
                 if identifier in attempted_identifiers:
                     continue
@@ -133,11 +157,17 @@ class EditionResolutionService:
         # never contacted once an earlier source yields a verified EPUB.
         for source in self.dynamic_sources:
             try:
-                entries = await source.find_all(
-                    request.work_title,
-                    request.work_authors,
-                    request.physical_isbn13,
+                entries = await asyncio.wait_for(
+                    source.find_all(
+                        request.work_title,
+                        request.work_authors,
+                        request.physical_isbn13,
+                    ),
+                    timeout=12,
                 )
+            except TimeoutError:
+                source_unavailable = SourceUnavailable("A book source timed out")
+                continue
             except SourceUnavailable as error:
                 source_unavailable = error
                 continue

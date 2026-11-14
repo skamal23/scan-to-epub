@@ -60,6 +60,7 @@ type BackendClientOptions = {
 
 export function createBackendClient(options: BackendClientOptions): BackendClient {
   const baseUrl = options.baseUrl.replace(/\/+$/, '');
+  const fetcher = options.fetcher;
 
   return {
     async checkHealth() {
@@ -68,7 +69,7 @@ export function createBackendClient(options: BackendClientOptions): BackendClien
       try {
         let response: FetchResponse;
         try {
-          response = await options.fetcher(`${baseUrl}/health`, {
+          response = await fetcher(`${baseUrl}/health`, {
             method: 'GET',
             headers: { Accept: 'application/json' },
             signal: controller.signal,

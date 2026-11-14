@@ -15,9 +15,10 @@ class AcquiredEpub:
 
 
 class EditionResolveRequest(APIModel):
-    candidate_id: str
-    work_title: str
-    work_authors: list[str]
+    candidate_id: str = Field(max_length=512)
+    work_title: str = Field(min_length=1, max_length=512)
+    work_authors: list[str] = Field(max_length=16)
+    language: str | None = Field(default="en", max_length=16)
     physical_isbn13: str | None = None
     physical_publisher: str | None = None
     physical_published_date: str | None = None

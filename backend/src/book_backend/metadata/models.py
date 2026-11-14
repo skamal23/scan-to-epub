@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .isbn import normalize_isbn
 
@@ -39,9 +39,9 @@ class BookRecord:
 
 
 class MetadataSearchRequest(APIModel):
-    isbn: str | None = None
-    title: str | None = None
-    author: str | None = None
+    isbn: str | None = Field(default=None, max_length=32)
+    title: str | None = Field(default=None, max_length=512)
+    author: str | None = Field(default=None, max_length=256)
 
     @model_validator(mode="after")
     def validate_query(self):

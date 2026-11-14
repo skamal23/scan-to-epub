@@ -1,3 +1,5 @@
+> Historical export-demo plan. Superseded by the in-app library/reader implementation described in [README.md](README.md). Apple Books export and the old scenario launcher are no longer the app flow.
+
 # Physical Book to EPUB — Implementation Phases
 
 > **Implementation rule:** Complete and verify one phase before beginning the next. Each phase delivers a usable vertical slice across the backend and iOS app. Exact files, APIs, libraries, and code-level tasks will be decided when that phase begins.

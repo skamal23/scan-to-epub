@@ -1,0 +1,2 @@
+const { defineConfig } = require('@playwright/test');
+module.exports = defineConfig({ testDir: './e2e', testMatch: '*.spec.cjs', timeout: 60000, workers: 1, use: { channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome', baseURL: 'http://localhost:8081', viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, screenshot: 'only-on-failure', trace: 'retain-on-failure' }, webServer: { command: 'node node_modules/expo/bin/cli start --web --port 8081', url: 'http://localhost:8081', reuseExistingServer: !process.env.CI, timeout: 120000 } });

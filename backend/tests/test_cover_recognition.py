@@ -133,7 +133,7 @@ async def test_recognition_uses_text_as_primary_evidence_and_returns_high_confid
     assert result.confidence == "high"
     assert result.extracted_title == "PRIDE AND PREJUDICE"
     assert result.extracted_author == "Jane Austen"
-    assert [item.candidate_id for item in result.candidates] == ["right", "wrong"]
+    assert [item.candidate_id for item in result.candidates] == ["right"]
     assert result.candidates[0].match_reasons == ["Title match", "Author match", "Cover match"]
 
 

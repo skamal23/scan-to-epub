@@ -12,8 +12,19 @@ class Settings:
     google_books_api_key: str | None = None
     contact_email: str | None = None
     cover_max_bytes: int = 3_000_000
-    cover_timeout_seconds: float = 15.0
+    cover_timeout_seconds: float = 35.0
     epub_artifact_ttl_seconds: int = 600
+    artifact_database: str | None = None
+    resolve_timeout_seconds: float = 85.0
+    cors_origins: tuple[str, ...] = ("http://localhost:8081", "http://127.0.0.1:8081")
+
+    def __post_init__(self):
+        if self.environment == "production" and self.fixture_mode:
+            raise ValueError("Production cannot use fixture mode")
+        if self.cover_max_bytes <= 0 or self.cover_timeout_seconds <= 0:
+            raise ValueError("Cover limits must be positive")
+        if self.resolve_timeout_seconds <= 0:
+            raise ValueError("Resolution timeout must be positive")
 
     @classmethod
     def from_env(cls, values: Mapping[str, str] | None = None) -> "Settings":
@@ -33,6 +44,15 @@ class Settings:
             google_books_api_key=source.get("GOOGLE_BOOKS_API_KEY") or None,
             contact_email=source.get("BOOK_CONTACT_EMAIL") or None,
             cover_max_bytes=int(source.get("BOOK_COVER_MAX_BYTES", "3000000")),
-            cover_timeout_seconds=float(source.get("BOOK_COVER_TIMEOUT_SECONDS", "15")),
+            cover_timeout_seconds=float(source.get("BOOK_COVER_TIMEOUT_SECONDS", "35")),
             epub_artifact_ttl_seconds=epub_artifact_ttl_seconds,
+            cors_origins=tuple(
+                value.strip()
+                for value in source.get(
+                    "BOOK_CORS_ORIGINS", "http://localhost:8081,http://127.0.0.1:8081"
+                ).split(",")
+                if value.strip()
+            ),
+            artifact_database=source.get("BOOK_ARTIFACT_DATABASE") or None,
+            resolve_timeout_seconds=float(source.get("BOOK_RESOLVE_TIMEOUT_SECONDS", "85")),
         )

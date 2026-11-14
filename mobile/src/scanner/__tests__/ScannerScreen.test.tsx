@@ -1,7 +1,12 @@
-import { fireEvent, render, waitFor } from '@testing-library/react-native';
-import { StyleSheet, Text } from 'react-native';
+import { act, fireEvent, render, waitFor } from '@testing-library/react-native';
+import { AccessibilityInfo, StyleSheet, Text } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { metadataScenarios } from '../../dev/metadataScenarios';
+jest.mock(
+  'react-native-safe-area-context',
+  () => require('react-native-safe-area-context/jest/mock').default,
+);
 
 type MockEntranceProps = {
   children: React.ReactNode;
@@ -26,19 +31,12 @@ jest.mock('../../ui/Entrance', () => {
   const React = require('react');
   const { View } = require('react-native');
   return {
-    Entrance: (props: MockEntranceProps) => React.createElement(
-      View,
-      { testID: 'entrance' },
-      mockEntrance(props),
-    ),
+    Entrance: (props: MockEntranceProps) =>
+      React.createElement(View, { testID: 'entrance' }, mockEntrance(props)),
   };
 });
 
-import {
-  ScannerScreen,
-  ScannerView,
-  type CameraPermissionState,
-} from '../ScannerScreen';
+import { ScannerScreen, ScannerView, type CameraPermissionState } from '../ScannerScreen';
 import { colors } from '../../ui/theme';
 
 const granted: CameraPermissionState = {
@@ -149,9 +147,7 @@ describe('<ScannerView />', () => {
         captureDelayMs={0}
         now={() => 500}
         onIsbnAccepted={accepted}
-        scriptedObservations={[
-          { type: 'ean13', data: '9780141439518', at: 0 },
-        ]}
+        scriptedObservations={[{ type: 'ean13', data: '9780141439518', at: 0 }]}
       />,
     );
 
@@ -162,14 +158,10 @@ describe('<ScannerView />', () => {
   test('manual shutter captures a cover when no fresh ISBN is visible', () => {
     const captureCover = jest.fn();
     const view = render(
-      <ScannerView
-        {...baseProps}
-        permission={granted}
-        onCaptureCover={captureCover}
-      />,
+      <ScannerView {...baseProps} permission={granted} onCaptureCover={captureCover} />,
     );
 
-    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByText('Scan a book')).toBeTruthy();
     expect(view.queryByText('Cover photos are processed temporarily and not saved.')).toBeNull();
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
 
@@ -233,9 +225,7 @@ describe('<ScannerView />', () => {
     try {
       for (const view of [normal, fixture]) {
         expect(view.getByLabelText('Book scan guide')).toBeTruthy();
-        expect(
-          view.getByRole('button', { name: 'Capture cover or detected ISBN' }),
-        ).toBeTruthy();
+        expect(view.getByRole('button', { name: 'Capture cover or detected ISBN' })).toBeTruthy();
       }
     } finally {
       normal.unmount();
@@ -309,7 +299,7 @@ describe('<ScannerView />', () => {
     await waitFor(() => expect(view.getByText('Couldn’t identify this cover')).toBeTruthy());
     expect(view.getByRole('button', { name: 'Try another cover' })).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Scan the back barcode' }));
-    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByText('Scan a book')).toBeTruthy();
 
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
     await waitFor(() => expect(view.getByText('Couldn’t identify this cover')).toBeTruthy());
@@ -329,7 +319,7 @@ describe('<ScannerView />', () => {
             confidence: 'high',
             extractedTitle: 'Pride and Prejudice',
             extractedAuthor: 'Jane Austen',
-            candidates: [],
+            candidates: metadataScenarios.one,
             providerFailures: [],
           },
         }}
@@ -341,11 +331,62 @@ describe('<ScannerView />', () => {
     );
 
     fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
-    expect(view.getByText('Reading the cover…')).toBeTruthy();
+    expect(view.getByText('Finding your book…')).toBeTruthy();
     fireEvent.press(view.getByRole('button', { name: 'Cancel' }));
-    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByText('Scan a book')).toBeTruthy();
     await new Promise((resolve) => setTimeout(resolve, 75));
     expect(recognized).not.toHaveBeenCalled();
-    expect(view.getByText('Scan a cover or ISBN')).toBeTruthy();
+    expect(view.getByText('Scan a book')).toBeTruthy();
+  });
+  test('hands a recognized cover to confirmation with Reduce Motion enabled', async () => {
+    const preference = jest
+      .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
+      .mockResolvedValue(true);
+    const recognized = jest.fn();
+    const result = {
+      status: 'matched' as const,
+      confidence: 'high' as const,
+      extractedTitle: 'Pride and Prejudice',
+      extractedAuthor: 'Jane Austen',
+      candidates: metadataScenarios.one,
+      providerFailures: [],
+    };
+    const view = render(
+      <ScannerScreen
+        fixture={{ permission: granted, coverResult: result }}
+        onBack={jest.fn()}
+        onCoverRecognized={recognized}
+        onIsbnAccepted={jest.fn()}
+        onManualSearch={jest.fn()}
+      />,
+    );
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    await waitFor(() => expect(recognized).toHaveBeenCalledWith(result, undefined));
+    expect(recognized).toHaveBeenCalledTimes(1);
+    view.unmount();
+    preference.mockRestore();
+  });
+  test('ignores background barcodes during a cover lift and remains usable after cancellation', async () => {
+    let observe = (_value: { type: string; data: string }) => {};
+    const accepted = jest.fn();
+    const renderCamera = ({ onBarcodeScanned }: { onBarcodeScanned: typeof observe }) => {
+      observe = onBarcodeScanned;
+      return <Text>Fixture camera</Text>;
+    };
+    const props = {
+      ...baseProps,
+      permission: granted,
+      renderCamera,
+      onIsbnAccepted: accepted,
+      captureDelayMs: 0,
+      now: () => 500,
+    };
+    const view = render(<ScannerView {...props} busy />);
+    act(() => observe({ type: 'ean13', data: '9780141439518' }));
+    expect(view.getByText('Frame the front cover, or show the back barcode.')).toBeTruthy();
+    view.rerender(<ScannerView {...props} busy={false} />);
+    act(() => observe({ type: 'ean13', data: '9780141439518' }));
+    fireEvent.press(view.getByRole('button', { name: 'Capture cover or detected ISBN' }));
+    await waitFor(() => expect(accepted).toHaveBeenCalledWith('9780141439518'));
   });
 });

@@ -1,0 +1,34 @@
+name: App checks
+on: [push, pull_request]
+jobs:
+  mobile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+        working-directory: mobile
+      - run: pnpm typecheck && pnpm test && pnpm exec expo install --check
+        working-directory: mobile
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: mobile
+      - run: pnpm test:e2e
+        working-directory: mobile
+        env:
+          PLAYWRIGHT_CHANNEL: chromium
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-traces
+          path: mobile/test-results
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t book-backend ./backend
+      - run: docker run --rm --user root -v "$PWD/backend/tests:/app/tests:ro" -v "$PWD:/workspace:ro" book-backend sh -c 'pip install -c constraints.txt ".[dev]" && cd /workspace && pytest backend/tests -q && ruff check backend && ruff format --check backend'

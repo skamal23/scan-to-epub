@@ -33,21 +33,22 @@ describe('useReducedMotion', () => {
     mockIsReduceMotionEnabled = jest
       .spyOn(AccessibilityInfo, 'isReduceMotionEnabled')
       .mockResolvedValue(false);
-    jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(
-      ((eventName: string, listener: (enabled: boolean) => void) => {
-        if (eventName === 'reduceMotionChanged') {
-          reduceMotionListeners.add(listener);
-          return {
-            remove: () => {
-              reduceMotionListeners.delete(listener);
-              removeListener();
-            },
-          };
-        }
+    jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(((
+      eventName: string,
+      listener: (enabled: boolean) => void,
+    ) => {
+      if (eventName === 'reduceMotionChanged') {
+        reduceMotionListeners.add(listener);
+        return {
+          remove: () => {
+            reduceMotionListeners.delete(listener);
+            removeListener();
+          },
+        };
+      }
 
-        return { remove: removeListener };
-      }) as never,
-    );
+      return { remove: removeListener };
+    }) as never);
   });
 
   afterEach(() => {
@@ -133,5 +134,11 @@ describe('useReducedMotion', () => {
 
     view.unmount();
     expect(removeListener).toHaveBeenCalledTimes(1);
+  });
+  test('falls back to a usable static screen if reading the preference fails', async () => {
+    mockIsReduceMotionEnabled.mockRejectedValue(new Error('Unavailable'));
+    const view = render(<StatusProbe />);
+    await waitFor(() => expect(view.getByText('ready-reduced')).toBeTruthy());
+    view.unmount();
   });
 });

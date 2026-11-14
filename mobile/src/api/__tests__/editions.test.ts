@@ -38,6 +38,7 @@ const readyResult = {
     rightsStatement: 'Reviewed U.S. public-domain and CC0 edition.',
     attribution: null,
     territory: 'US',
+    language: 'en',
   },
   provenance: {
     catalogEntryId: 'standardebooks:pride',
@@ -77,6 +78,7 @@ test('builds a resolution request from the confirmed work and physical edition',
     workSourceIds: { open_library: 'OL66554W' },
     editionSourceIds: { open_library: 'OL7353617M' },
     territory: 'US',
+    language: 'en',
   });
 });
 
